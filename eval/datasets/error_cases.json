@@ -1,0 +1,63 @@
+[
+  {
+    "id": "day1-empty-resume",
+    "category": "input_validation",
+    "input": {
+      "resume_text": " ",
+      "raw_jobs": [
+        "Python"
+      ]
+    },
+    "expected": "validation_error"
+  },
+  {
+    "id": "day1-batch-over-limit",
+    "category": "input_validation",
+    "input": {
+      "resume_text": "Synthetic",
+      "raw_jobs": [
+        "Python",
+        "Python",
+        "Python",
+        "Python",
+        "Python",
+        "Python",
+        "Python",
+        "Python",
+        "Python",
+        "Python",
+        "Python",
+        "Python",
+        "Python",
+        "Python",
+        "Python",
+        "Python",
+        "Python",
+        "Python",
+        "Python",
+        "Python",
+        "Python"
+      ]
+    },
+    "expected": "validation_error"
+  },
+  {
+    "id": "day1-missing-llm-config",
+    "category": "configuration",
+    "input": {
+      "llm_model": "",
+      "llm_api_key": ""
+    },
+    "expected": "ConfigurationError"
+  },
+  {
+    "id": "day1-untrusted-model-output",
+    "category": "structured_output",
+    "input": {
+      "parsed": {
+        "wrong": "field"
+      }
+    },
+    "expected": "StructuredOutputError"
+  }
+]
