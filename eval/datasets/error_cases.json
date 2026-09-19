@@ -204,5 +204,94 @@
     "category": "structured_output",
     "id": "day3-live-intermittent-structured-output",
     "expected": "safe StructuredOutputError; retry deferred to Day 8"
+  },
+  {
+    "input": {
+      "required_skills": [],
+      "candidate_skills": [],
+      "projects": [],
+      "responsibilities": [],
+      "preferred_skills": []
+    },
+    "id": "day4-empty-dimensions",
+    "expected": "score_none_and_coverages_zero",
+    "category": "matching"
+  },
+  {
+    "input": {
+      "required_skills": [
+        "Python",
+        "Python3"
+      ],
+      "candidate_skills": [
+        "Python"
+      ]
+    },
+    "id": "day4-canonical-duplicate",
+    "expected": "deduplicate_before_coverage",
+    "category": "matching"
+  },
+  {
+    "input": {
+      "required_skills": [
+        "LangGraph"
+      ],
+      "candidate_skills": [
+        "LangChain"
+      ]
+    },
+    "id": "day4-related-not-equivalent",
+    "expected": "missing_required_skill",
+    "category": "matching"
+  },
+  {
+    "input": {
+      "responsibilities": [
+        "Build APIs"
+      ],
+      "projects": []
+    },
+    "id": "day4-no-project",
+    "expected": "project_similarity_unavailable",
+    "category": "matching"
+  },
+  {
+    "input": {
+      "expected_vectors": 2,
+      "actual_vectors": 1
+    },
+    "id": "day4-embedding-vector-count",
+    "expected": "MatchCalculationError",
+    "category": "matching"
+  },
+  {
+    "input": {
+      "vector_value": "NaN"
+    },
+    "id": "day4-embedding-nonfinite",
+    "expected": "MatchCalculationError",
+    "category": "matching"
+  },
+  {
+    "id": "day4-windows-console-evidence",
+    "input": {
+      "console": "GBK",
+      "evidence_separator": "Unicode arrow"
+    },
+    "expected": "ASCII-safe evidence",
+    "category": "output_encoding"
+  },
+  {
+    "id": "day4-required-preferred-alias-overlap",
+    "expected": "MatchCalculationError",
+    "category": "matching",
+    "input": {
+      "preferred_skills": [
+        "Python3"
+      ],
+      "required_skills": [
+        "Python"
+      ]
+    }
   }
 ]

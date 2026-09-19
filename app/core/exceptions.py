@@ -27,3 +27,7 @@ class ResumeGroundingError(JobPilotError):
 
 class JobGroundingError(JobPilotError):
     """Extracted job facts cannot be grounded in the job description."""
+
+
+class MatchCalculationError(JobPilotError):
+    """Deterministic matching or embedding validation failed."""

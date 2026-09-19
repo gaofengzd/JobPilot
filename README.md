@@ -2,7 +2,7 @@
 
 智能求职岗位分析 Agent。项目事实来源：[开发文档](docs/开发文档.md)。
 
-当前迭代：**Day 3 JD Analyzer 与 v0.1 双画像**。匹配、RAG、Graph 编排、API、UI 尚未实现。
+当前迭代：**Day 4 Matching Engine**。Gap、批量分析、RAG、Graph 编排、API、UI 尚未实现。
 GLM-4.7 已用三份合成简历和十条合成 JD 完成真实结构化调用验证；离线测试与真实服务结果分开记录。
 
 ## uv 环境与依赖
@@ -56,6 +56,8 @@ uv run --locked python main.py --check-llm
 - app/utils/resume_files.py：UTF-8 Markdown/TXT 与文本层 PDF 读取、大小限制和行级定位。
 - app/agents/resume_parser.py：CandidateProfile 结构化抽取、逐字段原文约束和证据校验。
 - app/agents/jd_analyzer.py：JobProfile 抽取、required/preferred 明示标记校验、证据 grounding。
+- app/business/matching_engine.py：确定性技能匹配、覆盖率、项目相似度、证据与可选总分。
+- app/services/embedding.py：固定版本的本地哈希 Embedding 基线，无网络调用。
 - tests：契约与基础设施测试，均不依赖真实网络。
 - eval/datasets/error_cases.json：Day 1 异常案例；其余数据集留待后续积累。
 
@@ -105,3 +107,14 @@ uv run --locked python main.py --demo-v01 data/sample_resumes/candidate_backend.
 ```
 
 `--demo-v01` 依次生成 `CandidateProfile` 和 `JobProfile`，不执行匹配或评分。十条岗位样例位于 `data/sample_jobs`，期望结果位于 `eval/datasets/jd_cases.json`。
+
+
+## Day 4 确定性匹配
+
+Matching Engine 接收已验证的 `CandidateProfile` 和 `JobProfile`，不调用 LLM。技能仅使用候选画像的 `skills` 字段，通过显式别名字典匹配；项目相关性使用固定 `local-hash-v1` 向量和 Python cosine。
+
+```powershell
+uv run --locked python main.py --match-demo
+```
+
+输出包含 matched/missing、required/preferred coverage、项目相似度、可读证据和按可用维度重新归一化的分数。分数是固定规则的匹配指标，不是录用概率。`local-hash-v1` 是可复现的词法相关性基线，不等同于通用语义 Embedding。

@@ -126,3 +126,34 @@
 - 记录：同一 backend-python 样例此前批量真实验证通过，正式 `--analyze-job` 单次调用出现 StructuredOutputError，随后 `--demo-v01` 对同一样例成功。
 - 决策：保持安全失败与零 SDK 重试，不在 Day 3 提前实现 Day 8 的 Retry/Reflection；失败案例加入 eval。
 - 影响：CLI 调用方当前可能收到可处理的退出码 1；不宣称所有单次真实调用稳定成功。
+
+## ADR-013：Day 4 技能匹配口径
+
+- 日期：2026-09-20
+- 状态：已采用
+- 决策：确定匹配只使用 CandidateProfile.skills；先做 NFKC、去空格、大小写规范和规范值去重，再应用代码内显式别名字典。
+- 原因：项目技术可以支持项目相关性，但不能在没有明确画像字段时暗中提升技能覆盖率；语义相关也不等价于掌握目标技能。
+- 影响：Python3/Python、Postgres/PostgreSQL、K8s/Kubernetes 等审阅过的别名可匹配；LangChain/LangGraph 保持不同。扩展别名必须新增 eval；required/preferred 在别名规范化后重叠时明确失败，避免重复计分。
+
+## ADR-014：项目相关性的本地固定基线
+
+- 日期：2026-09-20
+- 状态：已采用
+- 决策：Day 4 默认使用 `local-hash-v1`，对规范词和相邻词对做稳定哈希向量，再由 Python 计算项目与职责的全部 cosine 并取最大值。EmbeddingClient Protocol 保留替换边界。
+- 原因：当前没有独立 Embedding 服务配置；本地基线无需新依赖、网络或凭据，能满足确定性和失败注入验证。
+- 影响：该分数主要反映词法相关性，不宣称具备通用语义能力。未来替换固定 Embedding 模型时保持 MatchingEngine 输入输出不变，并更新 model_id、eval 基线和决策。
+
+## ADR-015：Match Score 维度与证据
+
+- 日期：2026-09-20
+- 状态：已采用
+- 决策：使用文档默认权重 required=0.5、preferred=0.2、project=0.3；仅对可用维度重归一化。coverage 空集合为 0.0 但不参与分数，无有效维度则 score=None。
+- 原因：严格落实开发文档公式，并避免把“不适用”当成零能力。
+- 影响：evidence 写明技能规范匹配、最高项目/职责配对、Embedding model_id 及可用权重；score_version 保持 1.0。教育/经验不进入分数。
+
+## Day 4 Windows 输出兼容性
+
+- 日期：2026-09-20
+- 决策：机器生成证据使用 ASCII `<->` 连接项目与职责。
+- 原因：真实离线 CLI 在默认 GBK 控制台输出 Unicode 箭头时触发 UnicodeEncodeError。
+- 影响：只改变可读证据字符，不改变 Schema 或计算结果；失败案例已加入 eval。

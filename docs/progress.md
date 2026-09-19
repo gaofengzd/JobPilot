@@ -1,9 +1,9 @@
 # 开发进度
 
 更新时间：2026-09-20
-当前迭代：Day 3
-版本：0.1.0（简历与 JD 双画像里程碑）
-状态：Day 3 实现完成；离线回归、10 条合成 JD 真实 GLM-4.7 验证及 v0.1 双画像串联通过。
+当前迭代：Day 4
+版本：0.1.1（确定性匹配能力）
+状态：Day 4 实现完成；Matching Engine、项目相关性基线与离线演示验证通过。
 落地目标：E:/00project/02agent/JobPilot
 
 ## 分部分记录
@@ -149,3 +149,37 @@ Day 4 实现独立 Matching Engine：由 Python 完成技能规范化、集合�
 - 正式目录 `--analyze-job` 首次真实调用返回安全 StructuredOutputError（退出码 1）；未记为通过，已加入 eval。
 - 随后的正式目录 `--demo-v01` 真实调用成功：Resume 与 JD 两次模型调用均完成，输出合法 CandidateProfile 和 JobProfile。
 - 当前不增加自动重试；受控 Retry 按开发文档保留到 Day 8。
+
+
+## Day 4 Matching Engine
+
+### 已完成
+
+- MatchingEngine 接收 CandidateProfile + JobProfile，输出既有 MatchResult；未修改公共 Schema。
+- Python 完成 Unicode/大小写/空格规范化、显式别名映射、规范值去重、matched/missing 集合和 coverage。
+- 技能确定匹配只读取 CandidateProfile.skills；项目技术不暗中并入技能集合。
+- `local-hash-v1` 使用标准库生成固定向量；Python 对所有项目与职责逐对计算 cosine，取最高相关配对并生成证据。
+- 默认分数按 required=0.5、preferred=0.2、project=0.3；不可用维度移除后重归一化，没有有效维度时 score=None。
+- 填充 7 条 matching eval 案例，新增 8 条失败/边界案例；新增 `--match-demo` 离线入口。
+- 无新增依赖，无 LLM、网络或外部 Embedding 调用。
+
+### 验证结果
+
+- Day 4 专项测试：20 passed。
+- 完整离线回归：112 passed。
+- Ruff 检查与格式检查通过；matching/error eval JSON 语法检查通过。
+- 离线 CLI `--match-demo` 成功，重复固定输入结果一致。
+- 验证覆盖：空集合、规范重复、显式别名、无项目、无职责、相关但不等价、最高项目配对、权重重分配和异常向量。
+- 首次 CLI 发现 Windows GBK 无法输出 Unicode 箭头；改为 ASCII `<->` 并加入 eval 后复验通过。
+- 本迭代不调用模型，因此没有“真实模型验证”结果，也没有把 mock 结果写成真实模型通过。
+
+### 限制
+
+- `local-hash-v1` 是词法哈希 Embedding 基线，能稳定衡量共享词特征，但不具备通用语义模型的同义理解能力。
+- 别名只认代码中的显式映射；语义相关不视为技能等价。
+- 教育和经验要求未纳入分数，符合开发文档边界。
+- 尚未实现 Day 5 Gap 与 BatchAnalyzer。
+
+## 下一次唯一目标
+
+Day 5 实现 GapAnalyzer + BatchAnalyzer：基于现有 MatchResult 生成有 JD 依据的 Gap，并对多个有效/失败岗位计算去重频率与统计口径。

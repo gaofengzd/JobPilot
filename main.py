@@ -6,12 +6,14 @@ from pathlib import Path
 
 from app.agents.jd_analyzer import JDAnalyzer
 from app.agents.resume_parser import ResumeParser
+from app.business.matching_engine import MatchingEngine
 from app.core.config import load_settings
 from app.core.exceptions import JobGroundingError, JobPilotError
 from app.core.logging import configure_logging
 from app.graph.state import create_initial_state
-from app.schemas.candidate import CandidateProfile
+from app.schemas.candidate import CandidateProfile, Project
 from app.schemas.common import Contract, NonEmptyText
+from app.schemas.job import JobProfile
 from app.services.llm import LLMClient
 from app.utils.resume_files import load_resume
 
@@ -35,6 +37,11 @@ def main() -> int:
         help="Analyze one UTF-8 job description with the configured model",
     )
     actions.add_argument(
+        "--match-demo",
+        action="store_true",
+        help="Run deterministic Day 4 matching without a model request",
+    )
+    actions.add_argument(
         "--demo-v01",
         nargs=2,
         metavar=("RESUME_PATH", "JOB_PATH"),
@@ -55,6 +62,27 @@ def main() -> int:
                 job_text, job_index=0, source_id=source_id
             )
             print(profile.model_dump_json(indent=2))
+            return 0
+        if args.match_demo:
+            candidate = CandidateProfile(
+                skills=["python3", "FastAPI"],
+                projects=[
+                    Project(
+                        name="Campus API",
+                        description="REST API for course search",
+                        technologies=["Python", "FastAPI"],
+                    )
+                ],
+            )
+            job = JobProfile(
+                job_index=0,
+                title="Backend Engineer",
+                required_skills=["Python", "FastAPI", "PostgreSQL"],
+                preferred_skills=["Docker"],
+                responsibilities=["Build and maintain REST APIs"],
+            )
+            result = MatchingEngine().match(candidate, job)
+            print(result.model_dump_json(indent=2))
             return 0
         if args.demo_v01:
             resume_path, job_path = args.demo_v01
