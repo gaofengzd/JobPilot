@@ -1,0 +1,8 @@
+Title: AI Agent Engineer
+Company: Pine Research
+Required skills: Python, LangGraph, RAG
+Preferred skills: FastAPI, vector databases
+Responsibilities: Build evidence-grounded assistant workflows
+Experience requirement: 2 years applied AI development
+Keywords: agents, retrieval
+The team is exploring Rust

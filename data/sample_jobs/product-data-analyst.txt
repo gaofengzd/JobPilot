@@ -1,0 +1,8 @@
+Title: Product Data Analyst
+Company: Bright Market
+Required skills: SQL, Python, dashboarding
+Preferred skills: Looker, experimentation
+Responsibilities: Analyze product adoption and retention
+Education requirement: Bachelor degree
+Keywords: metrics, insights
+Team tools include GitHub and Slack

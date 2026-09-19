@@ -23,3 +23,7 @@ class ResumeReadError(JobPilotError):
 
 class ResumeGroundingError(JobPilotError):
     """Extracted candidate facts cannot be grounded in the resume."""
+
+
+class JobGroundingError(JobPilotError):
+    """Extracted job facts cannot be grounded in the job description."""

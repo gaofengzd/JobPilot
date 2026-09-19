@@ -1,0 +1,7 @@
+Title: Platform Engineer
+Company: Summit Cloud
+Necessary skills: Linux, Terraform, Kubernetes
+A plus: Go, Prometheus
+Responsibilities: Operate the internal deployment platform
+Experience requirement: 4 years platform engineering
+Keywords: infrastructure, observability

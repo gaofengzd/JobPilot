@@ -1,0 +1,7 @@
+Title: Frontend Engineer
+Company: Harbor Commerce
+Required skills: TypeScript, React, CSS
+Preferred skills: Next.js, Playwright
+Responsibilities: Develop accessible customer interfaces
+Experience requirement: 2 years frontend development
+Keywords: accessibility, performance

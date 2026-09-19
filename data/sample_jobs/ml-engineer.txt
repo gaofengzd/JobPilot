@@ -1,0 +1,7 @@
+Title: Machine Learning Engineer
+Company: Cedar AI
+Mandatory skills: Python, PyTorch, scikit-learn
+Bonus skills: MLflow, Kubernetes
+Responsibilities: Train and deploy classification models
+Education requirement: Master degree
+Keywords: model serving, evaluation

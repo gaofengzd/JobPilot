@@ -2,8 +2,8 @@
 
 智能求职岗位分析 Agent。项目事实来源：[开发文档](docs/开发文档.md)。
 
-当前迭代：**Day 2 简历读取与结构化解析**。岗位解析、匹配、RAG、Graph 编排、API、UI 尚未实现。
-GLM-4.7 已用三份合成简历完成真实结构化调用验证；离线测试与真实服务结果分开记录。
+当前迭代：**Day 3 JD Analyzer 与 v0.1 双画像**。匹配、RAG、Graph 编排、API、UI 尚未实现。
+GLM-4.7 已用三份合成简历和十条合成 JD 完成真实结构化调用验证；离线测试与真实服务结果分开记录。
 
 ## uv 环境与依赖
 
@@ -55,6 +55,7 @@ uv run --locked python main.py --check-llm
 - app/services/llm.py：单一结构化模型客户端、超时、显式方法选择、安全错误。
 - app/utils/resume_files.py：UTF-8 Markdown/TXT 与文本层 PDF 读取、大小限制和行级定位。
 - app/agents/resume_parser.py：CandidateProfile 结构化抽取、逐字段原文约束和证据校验。
+- app/agents/jd_analyzer.py：JobProfile 抽取、required/preferred 明示标记校验、证据 grounding。
 - tests：契约与基础设施测试，均不依赖真实网络。
 - eval/datasets/error_cases.json：Day 1 异常案例；其余数据集留待后续积累。
 
@@ -92,3 +93,15 @@ uv run --locked python main.py --parse-resume data/sample_resumes/candidate_agen
 ```
 
 命令会调用已配置模型输出 `CandidateProfile` JSON。LLM 只负责抽取，Python 会拒绝原文中不存在的字段值、缺失证据或无效引用，并重建 `source_id` 和定位信息。
+
+
+## Day 3 岗位解析与 v0.1
+
+单条 JD 以 UTF-8 文本文件输入。LLM 负责语义抽取，Python 固定 `job_index`、校验原文事实、required/preferred 明示标记和证据定位。
+
+```powershell
+uv run --locked python main.py --analyze-job data/sample_jobs/backend-python.txt
+uv run --locked python main.py --demo-v01 data/sample_resumes/candidate_backend.md data/sample_jobs/backend-python.txt
+```
+
+`--demo-v01` 依次生成 `CandidateProfile` 和 `JobProfile`，不执行匹配或评分。十条岗位样例位于 `data/sample_jobs`，期望结果位于 `eval/datasets/jd_cases.json`。

@@ -1,0 +1,7 @@
+Title: Security Analyst
+Company: Oak Finance
+Mandatory skills: SIEM, incident response, Python
+Preferred skills: Splunk, cloud security
+Responsibilities: Investigate security alerts
+Experience requirement: 2 years security operations
+Keywords: SOC, threat detection

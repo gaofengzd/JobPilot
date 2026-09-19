@@ -2,10 +2,12 @@
 
 import argparse
 import json
+from pathlib import Path
 
+from app.agents.jd_analyzer import JDAnalyzer
 from app.agents.resume_parser import ResumeParser
 from app.core.config import load_settings
-from app.core.exceptions import JobPilotError
+from app.core.exceptions import JobGroundingError, JobPilotError
 from app.core.logging import configure_logging
 from app.graph.state import create_initial_state
 from app.schemas.candidate import CandidateProfile
@@ -27,6 +29,17 @@ def main() -> int:
         metavar="PATH",
         help="Parse one PDF, Markdown, or TXT resume with the configured model",
     )
+    actions.add_argument(
+        "--analyze-job",
+        metavar="PATH",
+        help="Analyze one UTF-8 job description with the configured model",
+    )
+    actions.add_argument(
+        "--demo-v01",
+        nargs=2,
+        metavar=("RESUME_PATH", "JOB_PATH"),
+        help="Parse one resume and one job description into structured profiles",
+    )
     args = parser.parse_args()
     try:
         settings = load_settings()
@@ -35,6 +48,30 @@ def main() -> int:
             document = load_resume(args.parse_resume)
             profile = ResumeParser(LLMClient(settings)).parse_document(document)
             print(profile.model_dump_json(indent=2))
+            return 0
+        if args.analyze_job:
+            job_text, source_id = _read_job(args.analyze_job)
+            profile = JDAnalyzer(LLMClient(settings)).analyze(
+                job_text, job_index=0, source_id=source_id
+            )
+            print(profile.model_dump_json(indent=2))
+            return 0
+        if args.demo_v01:
+            resume_path, job_path = args.demo_v01
+            llm = LLMClient(settings)
+            candidate = ResumeParser(llm).parse_document(load_resume(resume_path))
+            job_text, source_id = _read_job(job_path)
+            job = JDAnalyzer(llm).analyze(job_text, job_index=0, source_id=source_id)
+            print(
+                json.dumps(
+                    {
+                        "candidate_profile": candidate.model_dump(),
+                        "job_profile": job.model_dump(),
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
             return 0
 
         state = create_initial_state(
@@ -71,6 +108,19 @@ def main() -> int:
     except JobPilotError as exc:
         print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False))
         return 1
+
+
+def _read_job(path_value: str) -> tuple[str, str]:
+    path = Path(path_value)
+    if not path.is_file():
+        raise JobGroundingError("Job description file does not exist or is not a file.")
+    try:
+        text = path.read_text(encoding="utf-8-sig")
+    except UnicodeDecodeError:
+        raise JobGroundingError("Job description must be valid UTF-8 text.") from None
+    except OSError:
+        raise JobGroundingError("Job description file could not be read.") from None
+    return text, f"job:{path.name}"
 
 
 if __name__ == "__main__":

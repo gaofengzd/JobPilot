@@ -126,5 +126,83 @@
     },
     "expected": "unquoted_facts_rejected",
     "id": "day2-prompt-injection-as-data"
+  },
+  {
+    "id": "day3-empty-job-description",
+    "category": "job_grounding",
+    "expected": "JobGroundingError",
+    "input": {
+      "job_text": "   "
+    }
+  },
+  {
+    "id": "day3-invalid-job-index",
+    "category": "job_grounding",
+    "expected": "JobGroundingError",
+    "input": {
+      "job_index": -1,
+      "job_text": "Title: Engineer"
+    }
+  },
+  {
+    "id": "day3-model-invented-job-fact",
+    "category": "job_grounding",
+    "expected": "JobGroundingError",
+    "input": {
+      "model_required_skills": [
+        "Python",
+        "Go"
+      ],
+      "job_text": "Required skills: Python"
+    }
+  },
+  {
+    "id": "day3-missing-job-evidence",
+    "category": "job_grounding",
+    "expected": "JobGroundingError",
+    "input": {
+      "evidence": [],
+      "job_text": "Title: Engineer"
+    }
+  },
+  {
+    "id": "day3-required-preferred-swapped",
+    "category": "job_classification",
+    "expected": "JobGroundingError",
+    "input": {
+      "model_preferred_skills": [
+        "Python"
+      ],
+      "model_required_skills": [
+        "Redis"
+      ],
+      "job_text": "Required skills: Python; Preferred skills: Redis"
+    }
+  },
+  {
+    "id": "day3-ambiguous-skill",
+    "category": "job_classification",
+    "expected": "omit_from_required_and_preferred",
+    "input": {
+      "job_text": "The team is exploring Rust"
+    }
+  },
+  {
+    "input": {
+      "missing_field_model_value": "null"
+    },
+    "expected": "normalize_optional_field_to_none",
+    "category": "structured_output",
+    "id": "day3-string-null-placeholder"
+  },
+  {
+    "input": {
+      "provider": "GLM-4.7",
+      "command": "--analyze-job",
+      "case": "backend-python"
+    },
+    "category": "structured_output",
+    "id": "day3-live-intermittent-structured-output",
+    "expected": "safe StructuredOutputError; retry deferred to Day 8"
   }
 ]

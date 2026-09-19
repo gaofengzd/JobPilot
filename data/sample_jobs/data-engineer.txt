@@ -1,0 +1,7 @@
+Title: Data Engineer
+Company: River Analytics
+Must-have skills: Python, SQL, Airflow
+Nice-to-have skills: dbt, Spark
+Responsibilities: Build reliable batch data pipelines
+Experience requirement: 3 years data engineering
+Keywords: ETL, data quality

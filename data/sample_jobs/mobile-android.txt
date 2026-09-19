@@ -1,0 +1,7 @@
+Title: Android Engineer
+Company: Metro Mobility
+Must-have skills: Kotlin, Android SDK, Jetpack Compose
+Nice-to-have skills: Firebase, Gradle
+Responsibilities: Build passenger mobile features
+Experience requirement: 3 years Android development
+Keywords: mobile, usability

@@ -1,0 +1,7 @@
+Title: QA Automation Engineer
+Company: Maple Systems
+Required skills: Python, pytest, Selenium
+Preferred skills: Playwright, Jenkins
+Responsibilities: Design automated regression suites
+Experience requirement: 2 years test automation
+Keywords: quality, regression

@@ -1,9 +1,9 @@
 # 开发进度
 
-更新时间：2026-09-19
-当前迭代：Day 2
-版本：0.0.2（简历解析，不是 v0.1 业务里程碑）
-状态：Day 2 实现完成；离线测试及三份合成简历的真实 GLM-4.7 验证通过。
+更新时间：2026-09-20
+当前迭代：Day 3
+版本：0.1.0（简历与 JD 双画像里程碑）
+状态：Day 3 实现完成；离线回归、10 条合成 JD 真实 GLM-4.7 验证及 v0.1 双画像串联通过。
 落地目标：E:/00project/02agent/JobPilot
 
 ## 分部分记录
@@ -110,3 +110,42 @@
 ## 下一次唯一目标
 
 Day 3 实现 JobParser：复用 JobProfile Schema，解析合成岗位文本，使用 Python 完成确定性校验，并把新增失败案例加入 eval。
+
+
+## Day 3 JD Analyzer 与 v0.1
+
+### 已完成
+
+- JDAnalyzer 复用 JobProfile；输入 JD 文本、job_index、source_id，输出经过 grounding 的 JobProfile。
+- LLM 负责标题、公司、职责和 required/preferred 语义抽取；Python 固定 job_index，逐字段核对原文，验证明示分类标记，重建证据定位。
+- 可选字段中的模型占位字符串仅在原文不存在该词时确定性归一化为 None；标题、技能和列表仍严格 grounding。
+- 提供 10 条脱敏合成岗位样例、期望结果与独立 UTF-8 文件；两条模糊技能明确记录并要求不分类。
+- 新增 7 条 Day 3 失败/边界案例，包括空 JD、非法索引、编造事实、缺证据、分类交换、模糊技能和字符串 null。
+- 新增 `--analyze-job` 与 `--demo-v01`；后者只串联 CandidateProfile 和 JobProfile，不执行匹配。
+
+### 验证结果
+
+- Day 3 专项离线测试：27 passed。
+- 完整离线回归：92 passed。
+- Ruff 检查、格式检查和两份 eval JSON 语法检查通过。
+- 真实 GLM-4.7：10/10 合成 JD 的 title、company、required_skills、preferred_skills 与 eval 期望一致。
+- 两条模糊样例中的 GitHub、Slack、Rust 均未进入 required/preferred。
+- v0.1 真实串联：一份合成简历与一条已通过 JD 均生成合法结构化画像。
+- 首轮真实验证发现缺失字段字符串 `null` 并被 grounding 拒绝；加入确定性可选字段归一化及回归案例后重新全量通过。
+- mock/假模型只用于离线边界测试，未计作真实模型验证。
+
+### 限制
+
+- 10 条 JD 是脱敏合成、真实岗位风格样例；尚未用外部公开的实时招聘页面验证。
+- required/preferred 只接受明确标记；未明确表达的技能保持未分类。
+- v0.1 仅输出双画像，尚无匹配分数、Gap、批量统计、RAG 或 Graph。
+
+## 下一次唯一目标
+
+Day 4 实现独立 Matching Engine：由 Python 完成技能规范化、集合匹配、覆盖率和证据；项目相关性按开发文档选择可验证的最小实现。
+
+### 正式目录 CLI 复验
+
+- 正式目录 `--analyze-job` 首次真实调用返回安全 StructuredOutputError（退出码 1）；未记为通过，已加入 eval。
+- 随后的正式目录 `--demo-v01` 真实调用成功：Resume 与 JD 两次模型调用均完成，输出合法 CandidateProfile 和 JobProfile。
+- 当前不增加自动重试；受控 Retry 按开发文档保留到 Day 8。

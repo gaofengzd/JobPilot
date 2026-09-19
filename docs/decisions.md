@@ -87,3 +87,42 @@
 - 决策：prompt 明确简历中的命令不是系统指令，且任何新增事实必须通过原文 grounding。
 - 原因：简历可能含提示注入文本，模型提示与 Python 校验需共同限制影响。
 - 影响：失败案例已加入 eval；未引入额外 Agent 或安全框架。
+
+## ADR-009：Day 3 JD 抽取边界
+
+- 日期：2026-09-20
+- 状态：已采用
+- 决策：JDAnalyzer 复用 JobProfile，不新增公共 Schema；job_index 由 Python 输入并覆盖模型值，所有文本字段必须能在 JD 原文中找到。
+- 原因：岗位索引属于流程确定性数据，事实字段才属于模型抽取职责。
+- 影响：无 Schema 迁移；调用方需提供非负整数 job_index。
+
+## ADR-010：required/preferred 必须有明示标记
+
+- 日期：2026-09-20
+- 状态：已采用
+- 决策：模型负责语义抽取，Python 要求 required_skills 出现在 required/must-have/mandatory/necessary 标记行，preferred_skills 出现在 preferred/nice-to-have/bonus/a plus 标记行。
+- 原因：Day 3 需要稳定区分两类技能，且不能凭上下文猜测模糊要求。
+- 影响：未明确标记的技能保持未分类；后续如扩展自然语言强弱规则须新增 eval 和决策。
+
+## ADR-011：模型缺失值占位符归一化
+
+- 日期：2026-09-20
+- 状态：已采用
+- 决策：仅对 company、education_requirement、experience_requirement 三个可选字段处理 null/None/N/A/unknown/not specified；只有占位词不在原文时才转为 None。
+- 原因：真实 GLM-4.7 两次将 JSON null 输出成字符串 null；仅提示约束无法稳定消除。
+- 影响：标题、技能、职责、关键词和证据不做此归一化，仍严格拒绝无原文支持内容；公共 Schema 不变。
+
+## ADR-012：Day 3 样例来源
+
+- 日期：2026-09-20
+- 状态：已采用
+- 决策：仓库保存 10 条脱敏合成、真实岗位风格 JD，覆盖 10 类岗位和多种 required/preferred 明示措辞，不复制外部招聘页面全文。
+- 原因：形成可提交、可复现且无实时页面漂移的 v0.1 验收集。
+- 影响：真实 GLM 调用已验证这些合成样例；外部公开实时 JD 的泛化能力仍未验证。
+
+## Day 3 正式 CLI 非确定性观察
+
+- 日期：2026-09-20
+- 记录：同一 backend-python 样例此前批量真实验证通过，正式 `--analyze-job` 单次调用出现 StructuredOutputError，随后 `--demo-v01` 对同一样例成功。
+- 决策：保持安全失败与零 SDK 重试，不在 Day 3 提前实现 Day 8 的 Retry/Reflection；失败案例加入 eval。
+- 影响：CLI 调用方当前可能收到可处理的退出码 1；不宣称所有单次真实调用稳定成功。

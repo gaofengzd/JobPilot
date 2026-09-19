@@ -1,0 +1,8 @@
+Title: Backend Engineer
+Company: Northstar Labs
+Required skills: Python, FastAPI, PostgreSQL
+Preferred skills: Redis, Docker
+Responsibilities: Build and maintain REST APIs
+Education requirement: Bachelor degree
+Experience requirement: 2 years backend development
+Keywords: API, reliability

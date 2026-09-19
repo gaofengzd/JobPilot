@@ -1,1 +1,54 @@
-[]
+[
+  {
+    "id": "backend-python",
+    "text": "Title: Backend Engineer\nCompany: Northstar Labs\nRequired skills: Python, FastAPI, PostgreSQL\nPreferred skills: Redis, Docker\nResponsibilities: Build and maintain REST APIs\nEducation requirement: Bachelor degree\nExperience requirement: 2 years backend development\nKeywords: API, reliability",
+    "expected": {"title": "Backend Engineer", "company": "Northstar Labs", "required_skills": ["Python", "FastAPI", "PostgreSQL"], "preferred_skills": ["Redis", "Docker"]}
+  },
+  {
+    "id": "data-engineer",
+    "text": "Title: Data Engineer\nCompany: River Analytics\nMust-have skills: Python, SQL, Airflow\nNice-to-have skills: dbt, Spark\nResponsibilities: Build reliable batch data pipelines\nExperience requirement: 3 years data engineering\nKeywords: ETL, data quality",
+    "expected": {"title": "Data Engineer", "company": "River Analytics", "required_skills": ["Python", "SQL", "Airflow"], "preferred_skills": ["dbt", "Spark"]}
+  },
+  {
+    "id": "ml-engineer",
+    "text": "Title: Machine Learning Engineer\nCompany: Cedar AI\nMandatory skills: Python, PyTorch, scikit-learn\nBonus skills: MLflow, Kubernetes\nResponsibilities: Train and deploy classification models\nEducation requirement: Master degree\nKeywords: model serving, evaluation",
+    "expected": {"title": "Machine Learning Engineer", "company": "Cedar AI", "required_skills": ["Python", "PyTorch", "scikit-learn"], "preferred_skills": ["MLflow", "Kubernetes"]}
+  },
+  {
+    "id": "frontend-react",
+    "text": "Title: Frontend Engineer\nCompany: Harbor Commerce\nRequired skills: TypeScript, React, CSS\nPreferred skills: Next.js, Playwright\nResponsibilities: Develop accessible customer interfaces\nExperience requirement: 2 years frontend development\nKeywords: accessibility, performance",
+    "expected": {"title": "Frontend Engineer", "company": "Harbor Commerce", "required_skills": ["TypeScript", "React", "CSS"], "preferred_skills": ["Next.js", "Playwright"]}
+  },
+  {
+    "id": "devops-platform",
+    "text": "Title: Platform Engineer\nCompany: Summit Cloud\nNecessary skills: Linux, Terraform, Kubernetes\nA plus: Go, Prometheus\nResponsibilities: Operate the internal deployment platform\nExperience requirement: 4 years platform engineering\nKeywords: infrastructure, observability",
+    "expected": {"title": "Platform Engineer", "company": "Summit Cloud", "required_skills": ["Linux", "Terraform", "Kubernetes"], "preferred_skills": ["Go", "Prometheus"]}
+  },
+  {
+    "id": "qa-automation",
+    "text": "Title: QA Automation Engineer\nCompany: Maple Systems\nRequired skills: Python, pytest, Selenium\nPreferred skills: Playwright, Jenkins\nResponsibilities: Design automated regression suites\nExperience requirement: 2 years test automation\nKeywords: quality, regression",
+    "expected": {"title": "QA Automation Engineer", "company": "Maple Systems", "required_skills": ["Python", "pytest", "Selenium"], "preferred_skills": ["Playwright", "Jenkins"]}
+  },
+  {
+    "id": "mobile-android",
+    "text": "Title: Android Engineer\nCompany: Metro Mobility\nMust-have skills: Kotlin, Android SDK, Jetpack Compose\nNice-to-have skills: Firebase, Gradle\nResponsibilities: Build passenger mobile features\nExperience requirement: 3 years Android development\nKeywords: mobile, usability",
+    "expected": {"title": "Android Engineer", "company": "Metro Mobility", "required_skills": ["Kotlin", "Android SDK", "Jetpack Compose"], "preferred_skills": ["Firebase", "Gradle"]}
+  },
+  {
+    "id": "security-analyst",
+    "text": "Title: Security Analyst\nCompany: Oak Finance\nMandatory skills: SIEM, incident response, Python\nPreferred skills: Splunk, cloud security\nResponsibilities: Investigate security alerts\nExperience requirement: 2 years security operations\nKeywords: SOC, threat detection",
+    "expected": {"title": "Security Analyst", "company": "Oak Finance", "required_skills": ["SIEM", "incident response", "Python"], "preferred_skills": ["Splunk", "cloud security"]}
+  },
+  {
+    "id": "product-data-analyst",
+    "text": "Title: Product Data Analyst\nCompany: Bright Market\nRequired skills: SQL, Python, dashboarding\nPreferred skills: Looker, experimentation\nResponsibilities: Analyze product adoption and retention\nEducation requirement: Bachelor degree\nKeywords: metrics, insights\nTeam tools include GitHub and Slack",
+    "expected": {"title": "Product Data Analyst", "company": "Bright Market", "required_skills": ["SQL", "Python", "dashboarding"], "preferred_skills": ["Looker", "experimentation"]},
+    "ambiguous": ["GitHub", "Slack"]
+  },
+  {
+    "id": "ai-agent-engineer",
+    "text": "Title: AI Agent Engineer\nCompany: Pine Research\nRequired skills: Python, LangGraph, RAG\nPreferred skills: FastAPI, vector databases\nResponsibilities: Build evidence-grounded assistant workflows\nExperience requirement: 2 years applied AI development\nKeywords: agents, retrieval\nThe team is exploring Rust",
+    "expected": {"title": "AI Agent Engineer", "company": "Pine Research", "required_skills": ["Python", "LangGraph", "RAG"], "preferred_skills": ["FastAPI", "vector databases"]},
+    "ambiguous": ["Rust"]
+  }
+]
