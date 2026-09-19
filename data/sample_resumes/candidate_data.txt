@@ -1,0 +1,10 @@
+Name: Riley Wang
+Education: North River College
+Degree: Master
+Major: Data Science
+Dates: 2023-2025
+Skills: Python, pandas, scikit-learn
+Project: Churn Forecast
+Description: Customer churn classification
+Technologies: Python, pandas, scikit-learn
+Achievement: F1 score 0.86

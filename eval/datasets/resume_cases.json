@@ -1,1 +1,29 @@
-[]
+[
+  {
+    "id": "resume-backend-md",
+    "file": "data/sample_resumes/candidate_backend.md",
+    "expected": {
+      "skills": ["Python", "FastAPI", "PostgreSQL"],
+      "project_names": ["Campus API"],
+      "education_schools": ["Southlake University"]
+    }
+  },
+  {
+    "id": "resume-data-txt",
+    "file": "data/sample_resumes/candidate_data.txt",
+    "expected": {
+      "skills": ["Python", "pandas", "scikit-learn"],
+      "project_names": ["Churn Forecast"],
+      "education_schools": ["North River College"]
+    }
+  },
+  {
+    "id": "resume-agent-pdf",
+    "file": "data/sample_resumes/candidate_agent.pdf",
+    "expected": {
+      "skills": ["Python", "LangGraph", "RAG"],
+      "project_names": ["Paper Assistant"],
+      "education_schools": ["East Bay University"]
+    }
+  }
+]

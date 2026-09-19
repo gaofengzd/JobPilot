@@ -15,3 +15,11 @@ class ModelCallError(JobPilotError):
 
 class StructuredOutputError(JobPilotError):
     """Model response does not satisfy the requested contract."""
+
+
+class ResumeReadError(JobPilotError):
+    """Resume file cannot be safely read as supported text."""
+
+
+class ResumeGroundingError(JobPilotError):
+    """Extracted candidate facts cannot be grounded in the resume."""

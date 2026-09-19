@@ -1,8 +1,9 @@
-"""Day 1 offline smoke check; real provider calls require --check-llm."""
+"""JobPilot verification and incremental command-line entry point."""
 
 import argparse
 import json
 
+from app.agents.resume_parser import ResumeParser
 from app.core.config import load_settings
 from app.core.exceptions import JobPilotError
 from app.core.logging import configure_logging
@@ -10,6 +11,7 @@ from app.graph.state import create_initial_state
 from app.schemas.candidate import CandidateProfile
 from app.schemas.common import Contract, NonEmptyText
 from app.services.llm import LLMClient
+from app.utils.resume_files import load_resume
 
 
 class ConnectionCheck(Contract):
@@ -17,12 +19,24 @@ class ConnectionCheck(Contract):
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="JobPilot Day 1 verification")
-    parser.add_argument("--check-llm", action="store_true", help="Make one real model request")
+    parser = argparse.ArgumentParser(description="JobPilot incremental verification")
+    actions = parser.add_mutually_exclusive_group()
+    actions.add_argument("--check-llm", action="store_true", help="Make one real model request")
+    actions.add_argument(
+        "--parse-resume",
+        metavar="PATH",
+        help="Parse one PDF, Markdown, or TXT resume with the configured model",
+    )
     args = parser.parse_args()
     try:
         settings = load_settings()
         configure_logging(settings.log_level)
+        if args.parse_resume:
+            document = load_resume(args.parse_resume)
+            profile = ResumeParser(LLMClient(settings)).parse_document(document)
+            print(profile.model_dump_json(indent=2))
+            return 0
+
         state = create_initial_state(
             resume_text="Synthetic sample: Python",
             raw_jobs=["Synthetic Python JD"],

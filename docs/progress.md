@@ -1,9 +1,9 @@
 # 开发进度
 
-更新时间：2026-09-18
-当前迭代：Day 1
-版本：0.0.1（基础设施，不是 v0.1 业务里程碑）
-状态：本地实现及离线验证完成，真实模型连通性待配置和验收。
+更新时间：2026-09-19
+当前迭代：Day 2
+版本：0.0.2（简历解析，不是 v0.1 业务里程碑）
+状态：Day 2 实现完成；离线测试及三份合成简历的真实 GLM-4.7 验证通过。
 落地目标：E:/00project/02agent/JobPilot
 
 ## 分部分记录
@@ -81,3 +81,32 @@
 - 固定合成样例的真实 GLM-4.7 结构化调用成功，返回 jobpilot-ok；未发送简历或用户业务数据。
 - 最终完整离线测试 45 项、Ruff 与格式检查通过。
 - Day 1 模型连通性与结构化输出验收现已完成。
+
+
+## Day 2 简历读取与结构化解析
+
+### 已完成
+
+- 支持读取 UTF-8 Markdown/TXT 与文本层 PDF，单文件上限 5 MB；空文件、无文本 PDF、错误编码、超限及不支持格式均返回明确错误。
+- ResumeParser 复用 CandidateProfile；LLM 仅执行结构化抽取，Python 负责原文逐字段校验、证据检查及 source_id/locator 重建。
+- 提供 3 份合成简历和对应 eval 期望，覆盖 Markdown、TXT、PDF。
+- 新增 7 条 Day 2 失败案例，包含无文本文件、模型编造字段、证据缺失和提示注入文本。
+- 新增运行入口：`python main.py --parse-resume <path>`。
+
+### 验证结果
+
+- Day 2 专项测试：20 passed。
+- Day 1 回归测试：45 passed。
+- Ruff 检查与格式检查通过。
+- 真实 GLM-4.7：3/3 合成简历调用成功；关键 skills、project name、education school 与 eval 期望一致。
+- 以上真实调用只使用仓库内合成数据，不包含用户简历；mock 结果未计作真实模型验证。
+
+### 限制
+
+- 仅支持文本层 PDF，不支持扫描件 OCR。
+- 模型抽取具有非确定性；Python grounding 会阻断没有原文依据的输出，但不替代后续 Reflection。
+- 尚未实现岗位解析、匹配、LangGraph 工作流、RAG、API 或 UI。
+
+## 下一次唯一目标
+
+Day 3 实现 JobParser：复用 JobProfile Schema，解析合成岗位文本，使用 Python 完成确定性校验，并把新增失败案例加入 eval。

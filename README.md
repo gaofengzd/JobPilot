@@ -2,8 +2,8 @@
 
 智能求职岗位分析 Agent。项目事实来源：[开发文档](docs/开发文档.md)。
 
-当前迭代：**Day 1 基础设施与数据契约**。业务解析、匹配、RAG、Graph 编排、API、UI 尚未实现。
-真实模型调用尚未验收；离线及模拟传输验证与真实服务验证分开记录。
+当前迭代：**Day 2 简历读取与结构化解析**。岗位解析、匹配、RAG、Graph 编排、API、UI 尚未实现。
+GLM-4.7 已用三份合成简历完成真实结构化调用验证；离线测试与真实服务结果分开记录。
 
 ## uv 环境与依赖
 
@@ -53,6 +53,8 @@ uv run --locked python main.py --check-llm
   BatchStatistics、FinalReport，以及输入/证据等模型。
 - app/graph/state.py：全部状态字段、校验输入、独立默认值与 request_id。
 - app/services/llm.py：单一结构化模型客户端、超时、显式方法选择、安全错误。
+- app/utils/resume_files.py：UTF-8 Markdown/TXT 与文本层 PDF 读取、大小限制和行级定位。
+- app/agents/resume_parser.py：CandidateProfile 结构化抽取、逐字段原文约束和证据校验。
 - tests：契约与基础设施测试，均不依赖真实网络。
 - eval/datasets/error_cases.json：Day 1 异常案例；其余数据集留待后续积累。
 
@@ -77,3 +79,16 @@ Dockerfile、API、UI 和后续模块仅占位。
 
     $testTemp = Join-Path (Get-Location) ('.pytest_cache/verify-' + [guid]::NewGuid().ToString('N'))
     uv run --locked pytest -q --basetemp $testTemp
+
+
+## Day 2 简历解析
+
+支持 UTF-8 编码的 `.md`、`.txt` 和带文本层的 `.pdf`，单文件上限 5 MB。扫描件和 OCR 不在 v1.0 Day 2 范围内。
+
+```powershell
+uv run --locked python main.py --parse-resume data/sample_resumes/candidate_backend.md
+uv run --locked python main.py --parse-resume data/sample_resumes/candidate_data.txt
+uv run --locked python main.py --parse-resume data/sample_resumes/candidate_agent.pdf
+```
+
+命令会调用已配置模型输出 `CandidateProfile` JSON。LLM 只负责抽取，Python 会拒绝原文中不存在的字段值、缺失证据或无效引用，并重建 `source_id` 和定位信息。
