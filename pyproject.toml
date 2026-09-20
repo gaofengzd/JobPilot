@@ -9,6 +9,7 @@ dependencies = [
     "pydantic>=2,<3",
     "pydantic-settings>=2,<3",
     "pypdf>=5,<7",
+    "sentence-transformers>=3,<6",
 ]
 
 [tool.uv]

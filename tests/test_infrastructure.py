@@ -228,3 +228,14 @@ def test_real_adapter_with_mock_http_transport():
     assert result.message == "ok"
     assert requests[0]["tool_choice"] == "auto"
     assert requests[0]["tools"][0]["function"]["name"] == "Answer"
+
+
+def test_local_retrieval_model_paths_are_configurable(tmp_path):
+    config = settings(
+        embedding_model_path=tmp_path / "embedding",
+        embedding_device="cpu",
+        reranker_model_path=tmp_path / "reranker",
+    )
+    assert config.embedding_model_path == tmp_path / "embedding"
+    assert config.embedding_device == "cpu"
+    assert config.reranker_model_path == tmp_path / "reranker"

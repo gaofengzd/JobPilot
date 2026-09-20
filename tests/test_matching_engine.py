@@ -10,7 +10,7 @@ from app.business.matching_engine import MatchingEngine, normalize_skill
 from app.core.exceptions import MatchCalculationError
 from app.schemas.candidate import CandidateProfile, Project
 from app.schemas.job import JobProfile
-from app.services.embedding import HashingEmbeddingClient
+from app.services.embedding import BGEEmbeddingClient
 
 CASES_PATH = Path(__file__).parents[1] / "eval" / "datasets" / "matching_cases.json"
 
@@ -135,10 +135,38 @@ def test_empty_requirements_with_project_uses_only_project_weight():
     assert result.score == 100.0
 
 
-def test_hash_embedding_and_matching_are_deterministic():
-    embedding = HashingEmbeddingClient()
-    texts = ["REST API course search", "Build REST APIs"]
-    assert embedding.embed_documents(texts) == embedding.embed_documents(texts)
+class FakeSentenceModel:
+    def __init__(self):
+        self.calls = []
+
+    def encode(self, texts, **kwargs):
+        self.calls.append((texts, kwargs))
+        return [[1.0, 0.0] if "course" in text else [0.0, 1.0] for text in texts]
+
+
+def test_bge_client_is_local_lazy_normalized_and_cached(tmp_path):
+    model_dir = tmp_path / "bge-large-zh-v1.5"
+    model_dir.mkdir()
+    fake_model = FakeSentenceModel()
+    loader_calls = []
+
+    def loader(path, device):
+        loader_calls.append((path, device))
+        return fake_model
+
+    embedding = BGEEmbeddingClient(model_dir, device="cpu", loader=loader)
+    first = embedding.embed_documents(["course API", "Build APIs"])
+    second = embedding.embed_documents(["course API", "Build APIs"])
+    assert first == second == [[1.0, 0.0], [0.0, 1.0]]
+    assert loader_calls == [(model_dir, "cpu")]
+    assert fake_model.calls[0][1] == {
+        "normalize_embeddings": True,
+        "convert_to_numpy": True,
+        "show_progress_bar": False,
+    }
+
+
+def test_matching_is_deterministic_with_fixed_embedding():
     candidate = CandidateProfile(
         skills=["Python"],
         projects=[Project(name="Course API", description="REST API course search")],
@@ -149,8 +177,26 @@ def test_hash_embedding_and_matching_are_deterministic():
         required_skills=["Python"],
         responsibilities=["Build REST APIs"],
     )
-    engine = MatchingEngine(embedding)
+    vectors = [[0.0, 1.0], [0.0, 1.0]]
+    engine = MatchingEngine(StaticEmbedding(vectors))
     assert engine.match(candidate, job) == engine.match(candidate, job)
+
+
+def test_bge_client_rejects_missing_path_and_safe_loader_failure(tmp_path):
+    missing = BGEEmbeddingClient(tmp_path / "missing")
+    with pytest.raises(MatchCalculationError, match="does not exist"):
+        missing.embed_documents(["text"])
+
+    model_dir = tmp_path / "model"
+    model_dir.mkdir()
+
+    def failing_loader(path, device):
+        raise RuntimeError(f"private {path} {device}")
+
+    broken = BGEEmbeddingClient(model_dir, loader=failing_loader)
+    with pytest.raises(MatchCalculationError) as error:
+        broken.embed_documents(["private text"])
+    assert "private" not in str(error.value)
 
 
 @pytest.mark.parametrize(

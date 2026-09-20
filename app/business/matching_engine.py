@@ -8,7 +8,7 @@ from app.core.exceptions import MatchCalculationError
 from app.schemas.candidate import CandidateProfile, Project
 from app.schemas.job import JobProfile
 from app.schemas.match import MatchResult
-from app.services.embedding import EmbeddingClient, HashingEmbeddingClient
+from app.services.embedding import BGEEmbeddingClient, EmbeddingClient
 
 REQUIRED_WEIGHT = 0.5
 PREFERRED_WEIGHT = 0.2
@@ -35,7 +35,7 @@ SKILL_ALIASES = {
 
 class MatchingEngine:
     def __init__(self, embedding: EmbeddingClient | None = None) -> None:
-        self.embedding = embedding or HashingEmbeddingClient()
+        self.embedding = embedding or BGEEmbeddingClient()
 
     def match(self, candidate: CandidateProfile, job: JobProfile) -> MatchResult:
         candidate_skills = _candidate_skill_index(candidate.skills)

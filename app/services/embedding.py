@@ -1,11 +1,12 @@
-"""Deterministic local embedding baseline for project relevance."""
+"""Local BGE embedding adapter; model weights never leave the configured path."""
 
-import hashlib
-import math
-import re
-from typing import Protocol
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any, Protocol
 
-TOKEN_PATTERN = re.compile(r"[\w+#.-]+", re.UNICODE)
+from app.core.exceptions import MatchCalculationError
+
+DEFAULT_EMBEDDING_MODEL_PATH = Path("E:/00project/02agent/models/bge-large-zh-v1.5")
 
 
 class EmbeddingClient(Protocol):
@@ -14,33 +15,62 @@ class EmbeddingClient(Protocol):
     def embed_documents(self, texts: list[str]) -> list[list[float]]: ...
 
 
-class HashingEmbeddingClient:
-    """Map lexical features to fixed vectors without network or mutable state."""
+class BGEEmbeddingClient:
+    """Lazily load bge-large-zh-v1.5 from local storage."""
 
-    model_id = "local-hash-v1"
+    model_id = "bge-large-zh-v1.5"
 
-    def __init__(self, dimensions: int = 384) -> None:
-        if isinstance(dimensions, bool) or not isinstance(dimensions, int) or dimensions < 8:
-            raise ValueError("Embedding dimensions must be an integer of at least 8.")
-        self.dimensions = dimensions
+    def __init__(
+        self,
+        model_path: Path | str = DEFAULT_EMBEDDING_MODEL_PATH,
+        *,
+        device: str = "cpu",
+        loader: Callable[[Path, str], Any] | None = None,
+    ) -> None:
+        self.model_path = Path(model_path)
+        self.device = device
+        self._loader = loader or _load_sentence_transformer
+        self._model: Any | None = None
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
-        return [self._embed(text) for text in texts]
+        if not texts:
+            return []
+        model = self._get_model()
+        try:
+            encoded = model.encode(
+                texts,
+                normalize_embeddings=True,
+                convert_to_numpy=True,
+                show_progress_bar=False,
+            )
+            values = encoded.tolist() if hasattr(encoded, "tolist") else encoded
+            return [[float(value) for value in vector] for vector in values]
+        except Exception:
+            raise MatchCalculationError(
+                "Local embedding inference failed for bge-large-zh-v1.5."
+            ) from None
 
-    def _embed(self, text: str) -> list[float]:
-        vector = [0.0] * self.dimensions
-        for feature in _features(text):
-            digest = hashlib.sha256(feature.encode("utf-8")).digest()
-            index = int.from_bytes(digest[:4], "big") % self.dimensions
-            sign = 1.0 if digest[4] & 1 else -1.0
-            vector[index] += sign
-        norm = math.sqrt(sum(value * value for value in vector))
-        return [value / norm for value in vector] if norm else vector
+    def _get_model(self) -> Any:
+        if self._model is not None:
+            return self._model
+        if not self.model_path.is_dir():
+            raise MatchCalculationError(
+                "Local embedding model directory does not exist: " + str(self.model_path)
+            )
+        try:
+            self._model = self._loader(self.model_path, self.device)
+        except Exception:
+            raise MatchCalculationError(
+                "Local embedding model could not be loaded: bge-large-zh-v1.5."
+            ) from None
+        return self._model
 
 
-def _features(text: str) -> list[str]:
-    tokens = [token.casefold().strip("._-") for token in TOKEN_PATTERN.findall(text)]
-    tokens = [token for token in tokens if token]
-    features = [f"word:{token}" for token in tokens]
-    features.extend(f"pair:{left}|{right}" for left, right in zip(tokens, tokens[1:]))
-    return features
+def _load_sentence_transformer(model_path: Path, device: str) -> Any:
+    from sentence_transformers import SentenceTransformer
+
+    return SentenceTransformer(
+        str(model_path),
+        device=device,
+        local_files_only=True,
+    )

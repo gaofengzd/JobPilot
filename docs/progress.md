@@ -183,3 +183,26 @@ Day 4 实现独立 Matching Engine：由 Python 完成技能规范化、集合�
 ## 下一次唯一目标
 
 Day 5 实现 GapAnalyzer + BatchAnalyzer：基于现有 MatchResult 生成有 JD 依据的 Gap，并对多个有效/失败岗位计算去重频率与统计口径。
+
+## 本地 BGE 模型约束更新
+
+### 已完成
+
+- 用户指定后，Day 4 项目相似度从 `local-hash-v1` 切换为本地 `bge-large-zh-v1.5`。
+- 默认路径：`E:/00project/02agent/models/bge-large-zh-v1.5`；支持 `EMBEDDING_MODEL_PATH` 和 `EMBEDDING_DEVICE` 配置。
+- 客户端延迟加载、同进程缓存、向量归一化并设置 `local_files_only=True`；不会自动下载或切换模型。
+- 新增 sentence-transformers 运行依赖，uv.lock 和 requirements.txt 已由 uv 更新。
+- 本地 `bge-reranker-v2-m3` 已确认存在，默认规划路径为 `E:/00project/02agent/models/bge-reranker-v2-m3`。重排尚未实现，保留到 Day 6 纯向量检索基线评测之后。
+- 开发文档的技术栈、Day 4、Day 6、RAG 流程和 Future Work 已同步指定模型。
+
+### 实际验证
+
+- 完整离线回归：115 passed；Ruff 检查、格式检查和 error eval JSON 校验通过。
+- `bge-large-zh-v1.5` 从指定本地目录真实加载成功，没有下载模型。
+- 正式合成项目/JD 推理得到 project_similarity=0.629436，证据 model_id 为 bge-large-zh-v1.5，最终 score=52.22。
+- 该结果是本地 Embedding 真实推理；重排模型没有运行，不宣称 reranker 验证通过。
+
+### 下一步边界
+
+- Day 5 继续 GapAnalyzer + BatchAnalyzer，不提前实现重排。
+- Day 6 使用同一 bge-large-zh-v1.5 建立 RAG 向量基线；只有固定 eval 证明排序不足时才接入 bge-reranker-v2-m3。

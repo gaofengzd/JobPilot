@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     llm_max_retries: int = Field(default=0, ge=0, le=2)
     embedding_model: str = ""
     embedding_api_key: SecretStr = SecretStr("")
+    embedding_model_path: Path = Path("E:/00project/02agent/models/bge-large-zh-v1.5")
+    embedding_device: str = "cpu"
+    reranker_model_path: Path = Path("E:/00project/02agent/models/bge-reranker-v2-m3")
     knowledge_dir: Path = PROJECT_ROOT / "data" / "knowledge"
     vector_index_dir: Path = PROJECT_ROOT / "data" / "vector_index"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"

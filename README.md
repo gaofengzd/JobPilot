@@ -118,3 +118,12 @@ uv run --locked python main.py --match-demo
 ```
 
 输出包含 matched/missing、required/preferred coverage、项目相似度、可读证据和按可用维度重新归一化的分数。分数是固定规则的匹配指标，不是录用概率。`local-hash-v1` 是可复现的词法相关性基线，不等同于通用语义 Embedding。
+
+## 本地 Embedding 与重排模型
+
+- 当前项目相似度使用 `bge-large-zh-v1.5`，默认目录：`E:/00project/02agent/models/bge-large-zh-v1.5`。
+- 后续 RAG 继续复用该 Embedding。
+- 重排尚未实现；Day 6 先建立向量检索基线，仅在 eval 证明排序不足时使用 `bge-reranker-v2-m3`，默认目录：`E:/00project/02agent/models/bge-reranker-v2-m3`。
+- 两个模型目录都不提交 Git，运行时不自动下载，也不静默切换其他模型。
+
+首次加载 CPU 模型可能需要较长时间；同一进程内模型实例会缓存。

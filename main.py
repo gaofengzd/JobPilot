@@ -14,6 +14,7 @@ from app.graph.state import create_initial_state
 from app.schemas.candidate import CandidateProfile, Project
 from app.schemas.common import Contract, NonEmptyText
 from app.schemas.job import JobProfile
+from app.services.embedding import BGEEmbeddingClient
 from app.services.llm import LLMClient
 from app.utils.resume_files import load_resume
 
@@ -81,7 +82,10 @@ def main() -> int:
                 preferred_skills=["Docker"],
                 responsibilities=["Build and maintain REST APIs"],
             )
-            result = MatchingEngine().match(candidate, job)
+            embedding = BGEEmbeddingClient(
+                settings.embedding_model_path, device=settings.embedding_device
+            )
+            result = MatchingEngine(embedding).match(candidate, job)
             print(result.model_dump_json(indent=2))
             return 0
         if args.demo_v01:

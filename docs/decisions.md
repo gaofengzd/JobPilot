@@ -138,7 +138,7 @@
 ## ADR-014：项目相关性的本地固定基线
 
 - 日期：2026-09-20
-- 状态：已采用
+- 状态：已被 ADR-016 取代
 - 决策：Day 4 默认使用 `local-hash-v1`，对规范词和相邻词对做稳定哈希向量，再由 Python 计算项目与职责的全部 cosine 并取最大值。EmbeddingClient Protocol 保留替换边界。
 - 原因：当前没有独立 Embedding 服务配置；本地基线无需新依赖、网络或凭据，能满足确定性和失败注入验证。
 - 影响：该分数主要反映词法相关性，不宣称具备通用语义能力。未来替换固定 Embedding 模型时保持 MatchingEngine 输入输出不变，并更新 model_id、eval 基线和决策。
@@ -157,3 +157,15 @@
 - 决策：机器生成证据使用 ASCII `<->` 连接项目与职责。
 - 原因：真实离线 CLI 在默认 GBK 控制台输出 Unicode 箭头时触发 UnicodeEncodeError。
 - 影响：只改变可读证据字符，不改变 Schema 或计算结果；失败案例已加入 eval。
+
+
+## ADR-016：固定本地 BGE Embedding 与 Reranker
+
+- 日期：2026-09-20
+- 状态：已采用
+- 决策：所有现有及后续 Embedding 统一使用本地 `bge-large-zh-v1.5`，默认路径 `E:/00project/02agent/models/bge-large-zh-v1.5`；需要重排时统一使用本地 `bge-reranker-v2-m3`，默认路径 `E:/00project/02agent/models/bge-reranker-v2-m3`。
+- 实现：Embedding 通过 sentence-transformers 延迟加载，`local_files_only=True`、归一化输出、默认 CPU、同实例缓存。模型路径可配置，模型身份不得静默替换。
+- 原因：用户已提供固定本地模型；真实语义 Embedding 取代临时词法哈希基线，同时保持数据不离开本机。
+- 影响：新增 sentence-transformers 及其锁定依赖；项目相似度数值基线变化，MatchResult/MatchingEngine 公共契约不变。ADR-014 的 `local-hash-v1` 被取代。
+- 重排边界：当前没有 reranker 业务代码。Day 6 先运行纯向量检索 eval，仅在排序不足时接入 bge-reranker-v2-m3，不提前实现 Future Work。
+- 验证：bge-large-zh-v1.5 已从指定目录真实加载并完成合成项目/JD 推理；bge-reranker-v2-m3 仅确认文件存在，尚未执行推理。

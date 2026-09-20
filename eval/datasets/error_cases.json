@@ -293,5 +293,22 @@
         "Python"
       ]
     }
+  },
+  {
+    "category": "embedding",
+    "expected": "MatchCalculationError",
+    "input": {
+      "model_path": "missing"
+    },
+    "id": "embedding-local-model-missing"
+  },
+  {
+    "category": "embedding",
+    "expected": "safe MatchCalculationError",
+    "input": {
+      "loader": "failure",
+      "model": "bge-large-zh-v1.5"
+    },
+    "id": "embedding-local-inference-failed"
   }
 ]
