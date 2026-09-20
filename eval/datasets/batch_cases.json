@@ -1,0 +1,28 @@
+[
+  {
+    "id": "canonical-skill-counted-once-per-job",
+    "candidate_skills": ["Python"],
+    "jobs": [
+      {"job_index": 0, "required_skills": ["Python", "Python3"], "preferred_skills": []},
+      {"job_index": 1, "required_skills": [], "preferred_skills": ["python"]}
+    ],
+    "expected": {"skill": "Python", "required_count": 1, "preferred_count": 1, "any_count": 2, "ratio": 1.0}
+  },
+  {
+    "id": "partial-failure-uses-valid-denominator",
+    "candidate_skills": [],
+    "total_jobs": 3,
+    "valid_jobs": 2,
+    "failed_jobs": 1,
+    "expected_ratio_denominator": 2
+  },
+  {
+    "id": "required-and-preferred-remain-separate",
+    "candidate_skills": [],
+    "jobs": [
+      {"job_index": 0, "required_skills": ["SQL"], "preferred_skills": []},
+      {"job_index": 1, "required_skills": [], "preferred_skills": ["SQL"]}
+    ],
+    "expected": {"required_count": 1, "preferred_count": 1, "any_count": 2}
+  }
+]

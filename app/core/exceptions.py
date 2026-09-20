@@ -31,3 +31,11 @@ class JobGroundingError(JobPilotError):
 
 class MatchCalculationError(JobPilotError):
     """Deterministic matching or embedding validation failed."""
+
+
+class GapAnalysisError(JobPilotError):
+    """A skill gap cannot be linked to its job and JD evidence."""
+
+
+class BatchAnalysisError(JobPilotError):
+    """Batch inputs or deterministic statistics are inconsistent."""

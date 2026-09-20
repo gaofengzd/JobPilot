@@ -169,3 +169,19 @@
 - 影响：新增 sentence-transformers 及其锁定依赖；项目相似度数值基线变化，MatchResult/MatchingEngine 公共契约不变。ADR-014 的 `local-hash-v1` 被取代。
 - 重排边界：当前没有 reranker 业务代码。Day 6 先运行纯向量检索 eval，仅在排序不足时接入 bge-reranker-v2-m3，不提前实现 Future Work。
 - 验证：bge-large-zh-v1.5 已从指定目录真实加载并完成合成项目/JD 推理；bge-reranker-v2-m3 仅确认文件存在，尚未执行推理。
+
+## ADR-017：Day 5 Gap 的来源与优先级
+
+- 日期：2026-09-20
+- 状态：已采用
+- 决策：Gap 只从已验证 MatchResult 的 missing 分区生成；required priority=1、preferred priority=2，每项必须绑定包含该技能的 JobProfile.evidence。
+- 原因：避免 LLM 或新规则再次解释匹配结果，并保证 Gap 能在 JD 中定位。
+- 影响：JobProfile 与 MatchResult 的 job_index 不一致、缺失技能不属于岗位、或 JD 证据缺失时返回 GapAnalysisError；公共 Schema 无迁移。
+
+## ADR-018：Day 5 批量统计口径
+
+- 日期：2026-09-20
+- 状态：已采用
+- 决策：技能按 MatchingEngine 的显式规范化规则聚合；同一岗位内每个规范技能只计一次，required/preferred 分别计数，any_count 使用岗位并集。ratio 分母为 valid_jobs，高频初始阈值为 0.5。
+- 原因：与开发文档 C.7 保持一致，使部分解析失败不会降低技能频率，并保持统计可复现。
+- 影响：BatchAnalyzer 接收 CandidateProfile、成功解析的 JobProfile 列表和 total_jobs；失败数由 total_jobs-valid_jobs 得出。完整 job_errors 编排留到 Day 7，公共 Schema 无迁移。

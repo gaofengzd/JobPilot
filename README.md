@@ -2,7 +2,7 @@
 
 智能求职岗位分析 Agent。项目事实来源：[开发文档](docs/开发文档.md)。
 
-当前迭代：**Day 4 Matching Engine**。Gap、批量分析、RAG、Graph 编排、API、UI 尚未实现。
+当前迭代：**Day 5 Gap + Batch**。Gap 与批量统计已实现；RAG、Graph 编排、API、UI 尚未实现。
 GLM-4.7 已用三份合成简历和十条合成 JD 完成真实结构化调用验证；离线测试与真实服务结果分开记录。
 
 ## uv 环境与依赖
@@ -57,7 +57,9 @@ uv run --locked python main.py --check-llm
 - app/agents/resume_parser.py：CandidateProfile 结构化抽取、逐字段原文约束和证据校验。
 - app/agents/jd_analyzer.py：JobProfile 抽取、required/preferred 明示标记校验、证据 grounding。
 - app/business/matching_engine.py：确定性技能匹配、覆盖率、项目相似度、证据与可选总分。
-- app/services/embedding.py：固定版本的本地哈希 Embedding 基线，无网络调用。
+- app/agents/gap_analyzer.py：将缺失技能转换为可追溯 JD 证据的 SkillGap。
+- app/business/batch_analyzer.py：按有效岗位统计技能频率、高频缺失项和失败数。
+- app/services/embedding.py：从固定本地路径加载 bge-large-zh-v1.5，无网络下载。
 - tests：契约与基础设施测试，均不依赖真实网络。
 - eval/datasets/error_cases.json：Day 1 异常案例；其余数据集留待后续积累。
 
@@ -111,13 +113,13 @@ uv run --locked python main.py --demo-v01 data/sample_resumes/candidate_backend.
 
 ## Day 4 确定性匹配
 
-Matching Engine 接收已验证的 `CandidateProfile` 和 `JobProfile`，不调用 LLM。技能仅使用候选画像的 `skills` 字段，通过显式别名字典匹配；项目相关性使用固定 `local-hash-v1` 向量和 Python cosine。
+Matching Engine 接收已验证的 `CandidateProfile` 和 `JobProfile`，不调用 LLM。技能仅使用候选画像的 skills 字段，通过显式别名字典匹配；项目相关性使用本地 bge-large-zh-v1.5 向量和 Python cosine。
 
 ```powershell
 uv run --locked python main.py --match-demo
 ```
 
-输出包含 matched/missing、required/preferred coverage、项目相似度、可读证据和按可用维度重新归一化的分数。分数是固定规则的匹配指标，不是录用概率。`local-hash-v1` 是可复现的词法相关性基线，不等同于通用语义 Embedding。
+输出包含 matched/missing、required/preferred coverage、项目相似度、可读证据和按可用维度重新归一化的分数。分数是固定规则的匹配指标，不是录用概率。
 
 ## 本地 Embedding 与重排模型
 
@@ -127,3 +129,13 @@ uv run --locked python main.py --match-demo
 - 两个模型目录都不提交 Git，运行时不自动下载，也不静默切换其他模型。
 
 首次加载 CPU 模型可能需要较长时间；同一进程内模型实例会缓存。
+
+## Day 5 Gap 与批量分析
+
+GapAnalyzer 将 MatchingEngine 的缺失技能转换为 SkillGap。每项 Gap 必须能绑定原岗位的 JD 证据；必需技能优先级为 1，优先技能为 2。“未在简历体现”不解释为用户绝对不会。
+
+BatchAnalyzer 对成功解析的岗位按规范技能逐岗位去重，分别统计 required、preferred 和岗位并集频率。ratio 的分母只使用 valid_jobs，失败岗位单独显示；初始高频阈值为 0.5。
+
+    uv run --locked python main.py --demo-v02
+
+该离线演示使用 5 个合成岗位输入，其中 4 个有效、1 个模拟解析失败；输出岗位排名、所选岗位 Gap 和批量统计。不调用 LLM，也不加载 Embedding 模型。

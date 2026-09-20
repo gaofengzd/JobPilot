@@ -1,9 +1,9 @@
 # 开发进度
 
 更新时间：2026-09-20
-当前迭代：Day 4
-版本：0.1.1（确定性匹配能力）
-状态：Day 4 实现完成；Matching Engine、项目相关性基线与离线演示验证通过。
+当前迭代：Day 5
+版本：0.2（Gap 与批量统计）
+状态：Day 5 实现完成；GapAnalyzer、BatchAnalyzer 与 v0.2 离线演示验证通过。
 落地目标：E:/00project/02agent/JobPilot
 
 ## 分部分记录
@@ -206,3 +206,35 @@ Day 5 实现 GapAnalyzer + BatchAnalyzer：基于现有 MatchResult 生成有 JD
 
 - Day 5 继续 GapAnalyzer + BatchAnalyzer，不提前实现重排。
 - Day 6 使用同一 bge-large-zh-v1.5 建立 RAG 向量基线；只有固定 eval 证明排序不足时才接入 bge-reranker-v2-m3。
+
+## Day 5 Gap + Batch
+
+### 已完成
+
+- GapAnalyzer 复用 JobProfile、MatchResult 和 SkillGap，按 job_index 绑定岗位。
+- Gap 只来自 MatchingEngine 的 missing required/preferred 集合；required 优先级为 1，preferred 为 2。
+- 每个 Gap 必须引用包含对应技能的 JD EvidenceRef；缺少依据时安全失败，不生成无来源 Gap。
+- BatchAnalyzer 对每条有效 JD 内的规范技能去重，required/preferred 分别计数，any_count 按岗位并集计数。
+- ratio 以 valid_jobs 为分母；total_jobs、valid_jobs、failed_jobs 明确展示，失败 JD 不作为空技能岗位。
+- 高频阈值初始为 0.5；只将候选人 skills 中没有规范匹配的高频技能列入 high_frequency_missing_skills。
+- 新增 --demo-v02：5 个合成岗位输入中 4 个有效、1 个模拟失败，输出匹配排名、目标岗位 Gap 和统计。
+- 新增 batch_cases.json 和 Day 5 失败案例；未修改公共 Schema，未新增依赖。
+
+### 实际验证
+
+- Day 5 专项测试：14 passed。
+- 正式目录完整离线回归：129 passed。
+- Ruff 检查和格式检查通过；error_cases.json 与 batch_cases.json 可解析。
+- --demo-v02 成功输出 5 个输入的 4 个匹配结果、1 个失败、目标岗位 Gap 和批量统计；SQL 以 2/4=0.5 成为高频缺失技能。
+- Day 5 没有 LLM 调用；专项测试和合成 CLI 不记作真实模型验证。
+
+### 限制
+
+- 批量入口当前接收已成功解析的 JobProfile，并由 total_jobs 表达失败数量；完整批量解析编排留到 Day 7。
+- 排名使用现有 MatchResult.score；相同分数维持输入顺序，不引入新的排名模型。
+- Gap 当前区分 not_mentioned；insufficient 留给以后有明确证据的分析，不凭语义猜测。
+- 尚未实现 Day 6 RAG、LearningPlanner 或 ResumeOptimizer。
+
+## 下一次唯一目标
+
+Day 6 使用本地 bge-large-zh-v1.5 建立可评测的知识库向量检索基线，实现可追溯 LearningPlanner 与最小 ResumeOptimizer；只有 eval 证明排序不足时才接入 bge-reranker-v2-m3。

@@ -310,5 +310,28 @@
       "model": "bge-large-zh-v1.5"
     },
     "id": "embedding-local-inference-failed"
+  },
+  {
+    "id": "day5-gap-missing-jd-evidence",
+    "category": "gap",
+    "input": {
+      "missing_required_skills": [
+        "SQL"
+      ],
+      "job_evidence": []
+    },
+    "expected": "GapAnalysisError"
+  },
+  {
+    "id": "day5-batch-invalid-denominator",
+    "category": "batch",
+    "input": {
+      "total_jobs": 1,
+      "valid_job_indexes": [
+        0,
+        1
+      ]
+    },
+    "expected": "BatchAnalysisError"
   }
 ]

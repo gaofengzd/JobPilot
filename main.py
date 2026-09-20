@@ -4,15 +4,17 @@ import argparse
 import json
 from pathlib import Path
 
+from app.agents.gap_analyzer import GapAnalyzer
 from app.agents.jd_analyzer import JDAnalyzer
 from app.agents.resume_parser import ResumeParser
+from app.business.batch_analyzer import BatchAnalyzer
 from app.business.matching_engine import MatchingEngine
 from app.core.config import load_settings
 from app.core.exceptions import JobGroundingError, JobPilotError
 from app.core.logging import configure_logging
 from app.graph.state import create_initial_state
 from app.schemas.candidate import CandidateProfile, Project
-from app.schemas.common import Contract, NonEmptyText
+from app.schemas.common import Contract, EvidenceRef, NonEmptyText
 from app.schemas.job import JobProfile
 from app.services.embedding import BGEEmbeddingClient
 from app.services.llm import LLMClient
@@ -41,6 +43,11 @@ def main() -> int:
         "--match-demo",
         action="store_true",
         help="Run deterministic Day 4 matching without a model request",
+    )
+    actions.add_argument(
+        "--demo-v02",
+        action="store_true",
+        help="Run the offline Day 5 five-job match, gap, and batch demo",
     )
     actions.add_argument(
         "--demo-v01",
@@ -87,6 +94,64 @@ def main() -> int:
             )
             result = MatchingEngine(embedding).match(candidate, job)
             print(result.model_dump_json(indent=2))
+            return 0
+        if args.demo_v02:
+            candidate = CandidateProfile(skills=["Python", "FastAPI", "Docker"])
+            specifications = [
+                (["Python", "FastAPI", "PostgreSQL"], ["Docker"]),
+                (["Python", "SQL", "Airflow"], ["Docker"]),
+                (["Python", "LangGraph", "RAG"], ["FastAPI"]),
+                (["Linux", "Kubernetes", "Terraform"], ["Python", "SQL"]),
+            ]
+            jobs = [
+                JobProfile(
+                    job_index=index,
+                    title=f"Synthetic Job {index + 1}",
+                    required_skills=required,
+                    preferred_skills=preferred,
+                    evidence=[
+                        EvidenceRef(
+                            source_id=f"job:{index}",
+                            quote="Required skills: " + ", ".join(required),
+                            locator="line:1",
+                        ),
+                        EvidenceRef(
+                            source_id=f"job:{index}",
+                            quote="Preferred skills: " + ", ".join(preferred),
+                            locator="line:2",
+                        ),
+                    ],
+                )
+                for index, (required, preferred) in enumerate(specifications)
+            ]
+            engine = MatchingEngine()
+            matches = [engine.match(candidate, job) for job in jobs]
+            selected = max(
+                matches,
+                key=lambda item: item.score if item.score is not None else -1,
+            )
+            selected_job = next(job for job in jobs if job.job_index == selected.job_index)
+            output = {
+                "version": "0.2",
+                "total_jobs": 5,
+                "job_errors": {"4": "Synthetic invalid JD excluded before analysis."},
+                "matches": [
+                    item.model_dump()
+                    for item in sorted(
+                        matches,
+                        key=lambda item: item.score if item.score is not None else -1,
+                        reverse=True,
+                    )
+                ],
+                "selected_job_index": selected.job_index,
+                "skill_gaps": [
+                    item.model_dump() for item in GapAnalyzer().analyze(selected_job, selected)
+                ],
+                "batch_statistics": BatchAnalyzer()
+                .analyze(candidate, jobs, total_jobs=5)
+                .model_dump(),
+            }
+            print(json.dumps(output, ensure_ascii=False, indent=2))
             return 0
         if args.demo_v01:
             resume_path, job_path = args.demo_v01
