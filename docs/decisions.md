@@ -185,3 +185,43 @@
 - 决策：技能按 MatchingEngine 的显式规范化规则聚合；同一岗位内每个规范技能只计一次，required/preferred 分别计数，any_count 使用岗位并集。ratio 分母为 valid_jobs，高频初始阈值为 0.5。
 - 原因：与开发文档 C.7 保持一致，使部分解析失败不会降低技能频率，并保持统计可复现。
 - 影响：BatchAnalyzer 接收 CandidateProfile、成功解析的 JobProfile 列表和 total_jobs；失败数由 total_jobs-valid_jobs 得出。完整 job_errors 编排留到 Day 7，公共 Schema 无迁移。
+
+## ADR-019：Day 6 学习知识库与分块边界
+
+- 日期：2026-09-21
+- 状态：已采用
+- 决策：知识库只接受人工维护的 UTF-8 Markdown/TXT；默认分块 600 token、overlap 100，保留稳定 doc_id/chunk_id/source。拒绝符号链接、单文件超过 1 MB 和非法编码。
+- 原因：满足可追溯学习资料与最小安全输入边界，不引入爬虫或复杂文档管线。
+- 影响：新增 5 份小型学习资料和 RetrievalError；公共 Schema 无迁移。
+
+## ADR-020：Day 6 纯向量 FAISS 基线与重排决策
+
+- 日期：2026-09-21
+- 状态：已采用
+- 决策：使用本地 bge-large-zh-v1.5 归一化向量和 FAISS IndexFlatIP，Top-K 默认 4。固定 5 条人工标注案例真实结果为 Hit@1=5/5、Hit@4=5/5，因此不接入 bge-reranker-v2-m3。
+- 原因：开发文档要求先建立纯向量基线，只有固定 eval 证明排序不足时才增加重排。
+- 影响：新增 faiss-cpu 依赖；reranker 仍未运行，不能宣称已验证。小样本满分只说明当前固定集无需重排。
+
+## ADR-021：Day 6 建议生成采用确定性最小实现
+
+- 日期：2026-09-21
+- 状态：已采用
+- 决策：LearningPlanner 只组合明确包含 Gap 技能的 RetrievedDocument 并引用实际 chunk；ResumeOptimizer 只使用 CandidateProfile.evidence 和候选人已具备的目标技能。两者当前不调用 LLM。
+- 原因：先满足来源可追踪、空检索降级和不新增经历的 Day 6 验收，再在 Day 8 Reflection 前保持事实边界可验证。
+- 影响：建议表达较模板化；不改变 LearningPlan 或 ResumeSuggestion Schema。未来如引入 LLM 润色，必须保留相同 grounding 校验。
+
+## ADR-022：Day 7 Graph 只负责编排既有模块
+
+- 日期：2026-09-21
+- 状态：已采用
+- 决策：LangGraph 节点返回局部 State 更新，按固定主干调用 ResumeParser、JDAnalyzer、MatchingEngine、BatchAnalyzer、GapAnalyzer、RAG、LearningPlanner 和 ResumeOptimizer；不在节点内复制业务规则。
+- 原因：遵守六层依赖方向，并使各模块继续能够独立测试。
+- 影响：新增 langgraph 依赖和 WorkflowDependencies 注入边界；JobPilotState 与公共 Pydantic Schema 无迁移。
+
+## ADR-023：Day 7 岗位失败、选定岗位和学习路由
+
+- 日期：2026-09-21
+- 状态：已采用
+- 决策：JD 串行解析并保留原始索引；单条已知失败写入 job_errors。selected_job_index 失败时不选择替代岗位。学习分支只在存在所选岗位 Gap 且 need_advice=true 时执行，Retriever 延迟创建并在单次依赖容器中缓存。
+- 原因：避免岗位错位、详情混用和无必要的 BGE/FAISS 加载。
+- 影响：部分岗位失败返回 partial，全部核心岗位失败返回 failed；Day 8 再加入异常修复、Reflection 和工具调用，不在 Day 7 提前实现。

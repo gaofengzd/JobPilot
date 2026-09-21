@@ -1,9 +1,9 @@
 # 开发进度
 
-更新时间：2026-09-20
-当前迭代：Day 5
-版本：0.2（Gap 与批量统计）
-状态：Day 5 实现完成；GapAnalyzer、BatchAnalyzer 与 v0.2 离线演示验证通过。
+更新时间：2026-09-21
+当前迭代：Day 7
+版本：0.4（LangGraph 主干工作流）
+状态：Day 7 实现完成；State、Node、Edge 与 v0.4 离线工作流演示验证通过。
 落地目标：E:/00project/02agent/JobPilot
 
 ## 分部分记录
@@ -238,3 +238,73 @@ Day 5 实现 GapAnalyzer + BatchAnalyzer：基于现有 MatchResult 生成有 JD
 ## 下一次唯一目标
 
 Day 6 使用本地 bge-large-zh-v1.5 建立可评测的知识库向量检索基线，实现可追溯 LearningPlanner 与最小 ResumeOptimizer；只有 eval 证明排序不足时才接入 bge-reranker-v2-m3。
+
+## Day 6 RAG + LearningPlanner + ResumeOptimizer
+
+### 已完成
+
+- Loader 只读取受控知识目录中的 UTF-8 Markdown/TXT，拒绝符号链接、超限文件和非法编码。
+- Splitter 按可定位 token span 进行默认 600 token、100 token overlap 分块，保留 doc_id、chunk_id 和 source。
+- FaissVectorStore 使用本地 bge-large-zh-v1.5 归一化向量和 IndexFlatIP；Retriever 对每个 SkillGap 返回 Top-K RetrievedDocument。
+- 人工维护 5 份小型学习资料，覆盖 FastAPI、Docker、LangGraph、PostgreSQL 和 RAG。
+- LearningPlanner 只为内容中明确包含 Gap 技能的检索文档生成任务，source_chunk_ids 来自实际检索；无支持资料时只返回 warning。
+- ResumeOptimizer 只使用 CandidateProfile.evidence 和候选人已具备且岗位要求的技能；没有候选人证据时不生成建议。
+- 新增 5 条人工标注 rag_cases、5 条 Day 6 失败案例、--eval-rag 和 --demo-v03。
+- 新增 faiss-cpu，由 uv.lock 锁定并重新导出 requirements.txt；公共 Schema 未修改。
+
+### 实际验证
+
+- Day 6 专项离线测试：14 passed。
+- 完整离线回归：143 passed。
+- Ruff 检查与格式检查通过。
+- 本地 bge-large-zh-v1.5 + FAISS 真实检索：固定 5 条案例 Hit@1=5/5、Hit@4=5/5；每条期望文档均排第 1。
+- --demo-v03 真实加载本地 BGE，建立 5 个 chunk 的 FAISS 索引，Docker 与 LangGraph 均生成有 chunk 引用的学习任务；简历建议引用候选人原文。
+- 上述检索和演示未调用 GLM-4.7；不记作真实 LLM 验证。
+
+### 限制
+
+- 知识库只有 5 份人工资料，检索指标只代表该固定小样本，不能推断通用检索质量。
+- LearningPlanner 和 ResumeOptimizer 当前是确定性最小实现，未使用 LLM 做表达润色。
+- 纯向量基线在固定集上 Hit@1 和 Hit@4 均为 1.0，尚无证据表明需要重排，因此 bge-reranker-v2-m3 未接入、未运行。
+- FAISS 索引当前在进程内构建；持久化索引不是 v0.3 验收所需。
+- 尚未实现 Day 7 LangGraph 编排。
+
+## 下一次唯一目标
+
+Day 7 实现完整 LangGraph State、Node、Edge，将前六天模块串成 Workflow；保证简历只解析一次、selected_job_index 一致、无 Gap 时跳过学习分支。
+
+## Day 7 LangGraph Workflow
+
+### 已完成
+
+- 使用 LangGraph StateGraph 实现 validate_input、parse_resume、analyze_jobs、calculate_matches、calculate_statistics、analyze_gap、retrieve_knowledge、learning_plan、optimize_resume 和 final_report 节点。
+- 节点只编排既有模块并返回局部 State 更新；业务计算没有搬入 Graph。
+- 单份简历每次工作流只解析一次；JD 串行处理并保留原始 job_index，单条已知失败写入 job_errors。
+- selected_job_index 只指向原始 JD；选定岗位失败时不借用其他岗位 Gap，返回明确错误。
+- 只有存在 Gap 且 need_advice=true 才进入学习分支；无 Gap 或关闭建议时 Retriever 不创建、不索引、不加载 BGE。
+- 生成完整 FinalReport；根据核心结果和岗位失败明确区分 success、partial、failed。
+- 新增真实入口 --run-workflow 和离线合成演示 --demo-v04。
+- 新增 5 条 workflow eval 数据、3 条失败/路由案例和 7 个专项测试。
+- 新增 langgraph 直接依赖并更新 uv.lock、requirements.txt；JobPilotState 和公共 Pydantic Schema 未修改。
+
+### 实际验证
+
+- Day 7 专项离线测试：7 passed。
+- 完整离线回归：150 passed。
+- Ruff 检查、格式检查、workflow_cases/error_cases JSON 解析与 git diff check 通过。
+- --demo-v04 通过真实编译的 LangGraph 执行全部节点，生成 success FinalReport；selected_job_index=1，两个 Gap 和学习引用均属于岗位 1。
+- 离线测试和 --demo-v04 使用注入式确定性适配器，不是 GLM 或真实 BGE 验证。
+- 正式目录 uv sync --locked --all-groups 成功安装 langgraph==1.2.11 及锁定依赖。
+- 真实 --run-workflow --no-advice 成功：GLM-4.7 完成简历/JD 两次结构化调用，本地 BGE 项目相似度=0.624298，score=68.73，Graph 正确跳过 RAG 并返回 success。
+- 真实启用建议的 --run-workflow 成功：Docker 生成引用 docker:0 的学习任务；Redis 无知识覆盖，返回 warning 且未生成无来源任务；FinalReport 状态为 success。
+
+### 限制
+
+- Day 7 不实现 Tool Calling、Reflection、Retry 或修复循环；节点异常的受控修复属于 Day 8。
+- 已知单条 JD 失败可以形成 partial/failed 报告；简历解析或基础设施异常目前仍向调用方抛出。
+- 工作流当前串行执行，符合 v1.0 小批量边界。
+- 尚未实现 API 和 UI。
+
+## 下一次唯一目标
+
+Day 8 实现受控 retrieve_knowledge_tool 调用、明确条件边、Reflection、最多 2 次业务修复和终止状态；故障注入必须可定位并返回 partial/failed。

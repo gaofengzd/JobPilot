@@ -2,7 +2,7 @@
 
 智能求职岗位分析 Agent。项目事实来源：[开发文档](docs/开发文档.md)。
 
-当前迭代：**Day 5 Gap + Batch**。Gap 与批量统计已实现；RAG、Graph 编排、API、UI 尚未实现。
+当前迭代：**Day 7 LangGraph Workflow**。前六天模块已接入 State、Node、Edge 工作流；Tool Calling、Retry、Reflection、API 和 UI 尚未实现。
 GLM-4.7 已用三份合成简历和十条合成 JD 完成真实结构化调用验证；离线测试与真实服务结果分开记录。
 
 ## uv 环境与依赖
@@ -59,9 +59,12 @@ uv run --locked python main.py --check-llm
 - app/business/matching_engine.py：确定性技能匹配、覆盖率、项目相似度、证据与可选总分。
 - app/agents/gap_analyzer.py：将缺失技能转换为可追溯 JD 证据的 SkillGap。
 - app/business/batch_analyzer.py：按有效岗位统计技能频率、高频缺失项和失败数。
+- app/rag：受控知识加载、可追踪分块、本地 BGE、FAISS 向量检索。
+- app/agents/learning_planner.py：只使用检索 chunk 生成可追溯学习任务。
+- app/agents/resume_optimizer.py：只根据候选人证据生成最小措辞建议。
 - app/services/embedding.py：从固定本地路径加载 bge-large-zh-v1.5，无网络下载。
-- tests：契约与基础设施测试，均不依赖真实网络。
-- eval/datasets/error_cases.json：Day 1 异常案例；其余数据集留待后续积累。
+- tests：契约、基础设施、解析、匹配、Gap、批量统计和 RAG 离线测试。
+- eval/datasets：持续积累抽取、匹配、批量、RAG 和失败案例。
 
 模型计分、事实 Reflection、工具执行循环与整个请求时间预算不在此阶段实现。
 Dockerfile、API、UI 和后续模块仅占位。
@@ -139,3 +142,25 @@ BatchAnalyzer 对成功解析的岗位按规范技能逐岗位去重，分别统
     uv run --locked python main.py --demo-v02
 
 该离线演示使用 5 个合成岗位输入，其中 4 个有效、1 个模拟解析失败；输出岗位排名、所选岗位 Gap 和批量统计。不调用 LLM，也不加载 Embedding 模型。
+
+## Day 6 学习 RAG 与建议
+
+RAG 仅用于 Gap 到学习建议。人工维护的 Markdown/TXT 资料经过确定性分块，由本地 bge-large-zh-v1.5 生成归一化向量，并用 FAISS IndexFlatIP 检索。RetrievedDocument 保留来源、文档 ID、chunk ID 和检索分数。
+
+固定 5 条人工标注检索案例的真实本地基线为 Hit@1=5/5、Hit@4=5/5，因此本迭代没有接入 bge-reranker-v2-m3。LearningPlanner 只引用检索结果；空检索返回 warning。ResumeOptimizer 只改写候选人已有证据，不把 Gap 写成已有经历。
+
+    uv run --locked python main.py --eval-rag
+    uv run --locked python main.py --demo-v03
+
+两个命令均加载本地 BGE。--eval-rag 输出固定检索基线；--demo-v03 输出 Docker/LangGraph Gap、检索来源、学习任务与一条有候选人证据的简历建议，不调用 LLM。
+
+## Day 7 LangGraph 工作流
+
+工作流顺序为 validate_input → parse_resume → analyze_jobs → calculate_matches → calculate_statistics → analyze_gap。只有 selected job 存在 Gap 且 need_advice=true 时才进入 retrieve_knowledge → learning_plan，然后统一执行 optimize_resume → final_report。
+
+每条 JD 保留原始 job_index；单条失败进入 job_errors，不会使后续岗位错位。选定岗位失败时返回 partial/failed 报告和明确错误，不混用其他岗位的 Gap。Retriever 通过工厂延迟创建，无 Gap 或关闭建议时不会加载知识库或 BGE。
+
+    uv run --locked python main.py --demo-v04
+    uv run --locked python main.py --run-workflow data/sample_resumes/candidate_backend.md data/sample_jobs/backend-python.txt
+
+--demo-v04 是不调用模型和 Embedding 的合成离线 Graph 演示。--run-workflow 使用已配置 GLM、本地 BGE 和知识库执行真实工作流；可附加 --selected-job-index N 或 --no-advice。

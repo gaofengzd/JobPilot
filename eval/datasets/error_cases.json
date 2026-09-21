@@ -333,5 +333,77 @@
       ]
     },
     "expected": "BatchAnalysisError"
+  },
+  {
+    "id": "day6-knowledge-directory-missing",
+    "category": "rag",
+    "input": {
+      "knowledge_dir": "missing"
+    },
+    "expected": "RetrievalError"
+  },
+  {
+    "id": "day6-knowledge-invalid-utf8",
+    "category": "rag",
+    "input": {
+      "file": "invalid.txt"
+    },
+    "expected": "RetrievalError"
+  },
+  {
+    "id": "day6-retrieval-empty-query",
+    "category": "rag",
+    "input": {
+      "query": ""
+    },
+    "expected": "RetrievalError"
+  },
+  {
+    "id": "day6-empty-retrieval",
+    "category": "learning_plan",
+    "input": {
+      "gap": "UnknownSkill",
+      "retrieved_context": []
+    },
+    "expected": "warning and no unsupported task"
+  },
+  {
+    "id": "day6-resume-without-evidence",
+    "category": "resume_optimizer",
+    "input": {
+      "candidate_evidence": []
+    },
+    "expected": "empty suggestions"
+  },
+  {
+    "id": "day7-selected-job-failed",
+    "category": "workflow",
+    "input": {
+      "selected_job_index": 0,
+      "job_errors": {
+        "0": "parse failed"
+      }
+    },
+    "expected": "partial report with explicit error and no mixed details"
+  },
+  {
+    "id": "day7-no-gap-rag-skip",
+    "category": "workflow",
+    "input": {
+      "skill_gaps": [],
+      "need_advice": true
+    },
+    "expected": "retrieval not called"
+  },
+  {
+    "id": "day7-advice-disabled-rag-skip",
+    "category": "workflow",
+    "input": {
+      "skill_gaps": [
+        "Docker"
+      ],
+      "need_advice": false
+    },
+    "expected": "retrieval not called"
   }
 ]

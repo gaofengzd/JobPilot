@@ -1,0 +1,27 @@
+[
+  {
+    "id": "resume-parsed-once",
+    "input": {"jobs": 2},
+    "expected": {"resume_parser_calls": 1}
+  },
+  {
+    "id": "selected-index-preserved",
+    "input": {"selected_job_index": 1},
+    "expected": {"gap_job_index": 1, "learning_plan_job_index": 1}
+  },
+  {
+    "id": "no-gap-skips-learning",
+    "input": {"missing_skills": [], "need_advice": true},
+    "expected": {"retrieval_calls": 0, "learning_plan": null}
+  },
+  {
+    "id": "advice-disabled-skips-learning",
+    "input": {"missing_skills": ["Docker"], "need_advice": false},
+    "expected": {"retrieval_calls": 0, "learning_plan": null}
+  },
+  {
+    "id": "selected-job-failed",
+    "input": {"selected_job_index": 0, "job_errors": {"0": "parse failed"}},
+    "expected": {"status": "partial", "skill_gaps": [], "explicit_error": true}
+  }
+]

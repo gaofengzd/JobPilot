@@ -6,15 +6,21 @@ from pathlib import Path
 
 from app.agents.gap_analyzer import GapAnalyzer
 from app.agents.jd_analyzer import JDAnalyzer
+from app.agents.learning_planner import LearningPlanner
+from app.agents.resume_optimizer import ResumeOptimizer
 from app.agents.resume_parser import ResumeParser
 from app.business.batch_analyzer import BatchAnalyzer
 from app.business.matching_engine import MatchingEngine
 from app.core.config import load_settings
 from app.core.exceptions import JobGroundingError, JobPilotError
 from app.core.logging import configure_logging
+from app.graph.demo import build_demo_dependencies
 from app.graph.state import create_initial_state
+from app.graph.workflow import build_default_workflow, build_workflow
+from app.rag.retriever import KnowledgeRetriever
 from app.schemas.candidate import CandidateProfile, Project
 from app.schemas.common import Contract, EvidenceRef, NonEmptyText
+from app.schemas.gap import SkillGap
 from app.schemas.job import JobProfile
 from app.services.embedding import BGEEmbeddingClient
 from app.services.llm import LLMClient
@@ -45,6 +51,27 @@ def main() -> int:
         help="Run deterministic Day 4 matching without a model request",
     )
     actions.add_argument(
+        "--run-workflow",
+        nargs="+",
+        metavar="PATH",
+        help="Run the real workflow: first path is a resume, remaining paths are JDs",
+    )
+    actions.add_argument(
+        "--demo-v04",
+        action="store_true",
+        help="Run the offline Day 7 LangGraph workflow demonstration",
+    )
+    actions.add_argument(
+        "--demo-v03",
+        action="store_true",
+        help="Run the Day 6 local BGE, FAISS, learning, and resume advice demo",
+    )
+    actions.add_argument(
+        "--eval-rag",
+        action="store_true",
+        help="Run the five-case local BGE and FAISS Hit@K baseline",
+    )
+    actions.add_argument(
         "--demo-v02",
         action="store_true",
         help="Run the offline Day 5 five-job match, gap, and batch demo",
@@ -54,6 +81,17 @@ def main() -> int:
         nargs=2,
         metavar=("RESUME_PATH", "JOB_PATH"),
         help="Parse one resume and one job description into structured profiles",
+    )
+    parser.add_argument(
+        "--selected-job-index",
+        type=int,
+        default=0,
+        help="Original JD index selected for workflow details",
+    )
+    parser.add_argument(
+        "--no-advice",
+        action="store_true",
+        help="Skip the workflow learning retrieval branch",
     )
     args = parser.parse_args()
     try:
@@ -94,6 +132,126 @@ def main() -> int:
             )
             result = MatchingEngine(embedding).match(candidate, job)
             print(result.model_dump_json(indent=2))
+            return 0
+        if args.run_workflow:
+            if len(args.run_workflow) < 2:
+                raise JobGroundingError(
+                    "--run-workflow needs one resume path and at least one JD path."
+                )
+            resume_path, *job_paths = args.run_workflow
+            raw_jobs = [_read_job(path)[0] for path in job_paths]
+            state = create_initial_state(
+                resume_path=resume_path,
+                raw_jobs=raw_jobs,
+                selected_job_index=args.selected_job_index,
+                need_advice=not args.no_advice,
+                max_jobs=settings.max_jobs,
+            )
+            result = build_default_workflow(settings).invoke(state)
+            print(result["final_report"].model_dump_json(indent=2))
+            return 0
+        if args.demo_v04:
+            state = create_initial_state(
+                resume_text="Built a Python API with FastAPI",
+                raw_jobs=["backend", "agent"],
+                selected_job_index=1,
+                need_advice=True,
+                max_jobs=settings.max_jobs,
+            )
+            result = build_workflow(build_demo_dependencies()).invoke(state)
+            report = result["final_report"]
+            print(
+                json.dumps(
+                    {
+                        "mode": "offline-synthetic",
+                        "version": "0.4",
+                        "graph_status": result["status"],
+                        "report": report.model_dump(),
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+            return 0
+        if args.eval_rag or args.demo_v03:
+            embedding = BGEEmbeddingClient(
+                settings.embedding_model_path, device=settings.embedding_device
+            )
+            retriever = KnowledgeRetriever(embedding)
+            chunk_count = retriever.index_directory(settings.knowledge_dir)
+            if args.eval_rag:
+                from eval.evaluators.rag_eval import evaluate_hit_at_k
+
+                cases_path = Path("eval/datasets/rag_cases.json")
+                cases = json.loads(cases_path.read_text(encoding="utf-8"))
+                report = {
+                    "hit_at_1": evaluate_hit_at_k(retriever.store, cases, top_k=1),
+                    "hit_at_4": evaluate_hit_at_k(retriever.store, cases, top_k=4),
+                }
+                report["chunk_count"] = chunk_count
+                report["embedding_model"] = embedding.model_id
+                report["reranker_used"] = False
+                print(json.dumps(report, ensure_ascii=False, indent=2))
+                return 0
+
+            candidate_evidence = EvidenceRef(
+                source_id="resume:demo",
+                quote="Built a Python API with FastAPI",
+                locator="line:1",
+            )
+            candidate = CandidateProfile(
+                skills=["Python", "FastAPI"],
+                evidence=[candidate_evidence],
+            )
+            job = JobProfile(
+                job_index=0,
+                title="AI Backend Engineer",
+                required_skills=["Python", "Docker", "LangGraph"],
+                preferred_skills=["FastAPI"],
+            )
+            gaps = [
+                SkillGap(
+                    skill=skill,
+                    requirement_type="required",
+                    reason="Resume does not mention this required JD skill.",
+                    evidence_status="not_mentioned",
+                    jd_evidence=[
+                        EvidenceRef(
+                            source_id="job:demo",
+                            quote=f"Required skills: {skill}",
+                            locator="line:2",
+                        )
+                    ],
+                    priority=1,
+                )
+                for skill in ("Docker", "LangGraph")
+            ]
+            retrieved = []
+            for gap in gaps:
+                retrieved.extend(retriever.retrieve(gap))
+            documents = list({item.chunk_id: item for item in retrieved}.values())
+            plan = LearningPlanner().plan(
+                job_index=job.job_index,
+                gaps=gaps,
+                documents=documents,
+            )
+            suggestions = ResumeOptimizer().optimize(candidate, job, gaps)
+            print(
+                json.dumps(
+                    {
+                        "version": "0.3",
+                        "embedding_model": embedding.model_id,
+                        "reranker_used": False,
+                        "indexed_chunks": chunk_count,
+                        "skill_gaps": [item.model_dump() for item in gaps],
+                        "retrieved_context": [item.model_dump() for item in documents],
+                        "learning_plan": plan.model_dump(),
+                        "resume_suggestions": [item.model_dump() for item in suggestions],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
             return 0
         if args.demo_v02:
             candidate = CandidateProfile(skills=["Python", "FastAPI", "Docker"])

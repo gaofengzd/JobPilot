@@ -39,3 +39,7 @@ class GapAnalysisError(JobPilotError):
 
 class BatchAnalysisError(JobPilotError):
     """Batch inputs or deterministic statistics are inconsistent."""
+
+
+class RetrievalError(JobPilotError):
+    """Knowledge loading, indexing, or retrieval failed safely."""

@@ -5,7 +5,9 @@ description = "JobPilot v1.0 - Day 1 foundation"
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
 dependencies = [
+    "faiss-cpu>=1.8,<2",
     "langchain-openai>=1,<2",
+    "langgraph>=1,<2",
     "pydantic>=2,<3",
     "pydantic-settings>=2,<3",
     "pypdf>=5,<7",

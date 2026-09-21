@@ -1,4 +1,4 @@
-"""Day 1 state contract only; graph orchestration starts on Day 7."""
+"""Complete workflow state shared by the Day 7 LangGraph nodes."""
 
 from typing import Literal, TypedDict
 from uuid import uuid4

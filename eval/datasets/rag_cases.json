@@ -1,1 +1,27 @@
-[]
+[
+  {
+    "id": "fastapi-dependency-injection",
+    "query": "Learn FastAPI dependency injection and build a validated REST API",
+    "expected_doc_ids": ["fastapi"]
+  },
+  {
+    "id": "docker-python-container",
+    "query": "Containerize a Python service with Docker and a health check",
+    "expected_doc_ids": ["docker"]
+  },
+  {
+    "id": "langgraph-state-routing",
+    "query": "Learn LangGraph state nodes conditional edges and bounded retry",
+    "expected_doc_ids": ["langgraph"]
+  },
+  {
+    "id": "postgresql-indexes",
+    "query": "Improve PostgreSQL queries with indexes and EXPLAIN ANALYZE",
+    "expected_doc_ids": ["postgresql"]
+  },
+  {
+    "id": "rag-citations",
+    "query": "Build a RAG vector retrieval evaluation with traceable citations",
+    "expected_doc_ids": ["rag"]
+  }
+]

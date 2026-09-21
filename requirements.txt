@@ -34,6 +34,8 @@ cuda-toolkit==13.0.3.0 ; sys_platform == 'linux'
     # via torch
 distro==1.9.0
     # via langsmith
+faiss-cpu==1.15.1
+    # via jobpilot
 filelock==4.0.1
     # via
     #   huggingface-hub
@@ -56,6 +58,7 @@ httpx==0.28.1
     # via
     #   huggingface-hub
     #   langchain-core
+    #   langgraph-sdk
 httpx2==2.13.0
     # via
     #   langsmith
@@ -82,11 +85,28 @@ jsonpatch==1.33
 jsonpointer==3.1.1
     # via jsonpatch
 langchain-core==1.6.3
-    # via langchain-openai
+    # via
+    #   langchain-openai
+    #   langgraph
+    #   langgraph-checkpoint
+    #   langgraph-prebuilt
+    #   langgraph-sdk
 langchain-openai==1.6.2
     # via jobpilot
 langchain-protocol==0.0.19
-    # via langchain-core
+    # via
+    #   langchain-core
+    #   langgraph-sdk
+langgraph==1.2.11
+    # via jobpilot
+langgraph-checkpoint==4.2.0
+    # via
+    #   langgraph
+    #   langgraph-prebuilt
+langgraph-prebuilt==1.1.0
+    # via langgraph
+langgraph-sdk==0.4.4
+    # via langgraph
 langsmith==0.12.6
     # via langchain-core
 markdown-it-py==4.2.0
@@ -103,6 +123,7 @@ networkx==3.6.1
     # via torch
 numpy==2.4.6
     # via
+    #   faiss-cpu
     #   scikit-learn
     #   scipy
     #   sentence-transformers
@@ -150,10 +171,15 @@ nvidia-nvtx==13.0.85 ; (platform_machine == 'aarch64' and sys_platform == 'linux
     # via cuda-toolkit
 openai==3.15.0
     # via langchain-openai
-orjson==3.12.0 ; platform_python_implementation != 'PyPy'
-    # via langsmith
+orjson==3.12.0
+    # via
+    #   langgraph-sdk
+    #   langsmith
+ormsgpack==1.12.2
+    # via langgraph-checkpoint
 packaging==26.3
     # via
+    #   faiss-cpu
     #   huggingface-hub
     #   langchain-core
     #   langsmith
@@ -162,6 +188,7 @@ pydantic==2.13.5
     # via
     #   jobpilot
     #   langchain-core
+    #   langgraph
     #   langsmith
     #   openai
     #   pydantic-settings
@@ -264,9 +291,13 @@ uuid-utils==0.17.1
     # via
     #   langchain-core
     #   langsmith
-websockets==17.1
-    # via langsmith
+websockets==16.1.1
+    # via
+    #   langgraph-sdk
+    #   langsmith
 xxhash==4.0.1
-    # via langsmith
+    # via
+    #   langgraph
+    #   langsmith
 zstandard==0.25.0
     # via langsmith
