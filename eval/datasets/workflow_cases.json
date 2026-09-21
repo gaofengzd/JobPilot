@@ -1,27 +1,90 @@
 [
   {
     "id": "resume-parsed-once",
-    "input": {"jobs": 2},
-    "expected": {"resume_parser_calls": 1}
+    "input": {
+      "jobs": 2
+    },
+    "expected": {
+      "resume_parser_calls": 1
+    }
   },
   {
     "id": "selected-index-preserved",
-    "input": {"selected_job_index": 1},
-    "expected": {"gap_job_index": 1, "learning_plan_job_index": 1}
+    "input": {
+      "selected_job_index": 1
+    },
+    "expected": {
+      "gap_job_index": 1,
+      "learning_plan_job_index": 1
+    }
   },
   {
     "id": "no-gap-skips-learning",
-    "input": {"missing_skills": [], "need_advice": true},
-    "expected": {"retrieval_calls": 0, "learning_plan": null}
+    "input": {
+      "missing_skills": [],
+      "need_advice": true
+    },
+    "expected": {
+      "retrieval_calls": 0,
+      "learning_plan": null
+    }
   },
   {
     "id": "advice-disabled-skips-learning",
-    "input": {"missing_skills": ["Docker"], "need_advice": false},
-    "expected": {"retrieval_calls": 0, "learning_plan": null}
+    "input": {
+      "missing_skills": [
+        "Docker"
+      ],
+      "need_advice": false
+    },
+    "expected": {
+      "retrieval_calls": 0,
+      "learning_plan": null
+    }
   },
   {
     "id": "selected-job-failed",
-    "input": {"selected_job_index": 0, "job_errors": {"0": "parse failed"}},
-    "expected": {"status": "partial", "skill_gaps": [], "explicit_error": true}
+    "input": {
+      "selected_job_index": 0,
+      "job_errors": {
+        "0": "parse failed"
+      }
+    },
+    "expected": {
+      "status": "partial",
+      "skill_gaps": [],
+      "explicit_error": true
+    }
+  },
+  {
+    "id": "reflection-one-repair",
+    "input": {
+      "learning_source": "invalid_once"
+    },
+    "expected": {
+      "retry_count": 1,
+      "status": "success"
+    }
+  },
+  {
+    "id": "reflection-repair-limit",
+    "input": {
+      "learning_source": "always_invalid"
+    },
+    "expected": {
+      "retry_count": 2,
+      "status": "partial",
+      "learning_plan": null
+    }
+  },
+  {
+    "id": "tool-result-round-trip",
+    "input": {
+      "tool": "retrieve_knowledge_tool"
+    },
+    "expected": {
+      "tool_call_id_returned": true,
+      "executor_called": 1
+    }
   }
 ]

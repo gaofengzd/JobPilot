@@ -1,4 +1,4 @@
-"""Complete workflow state shared by the Day 7 LangGraph nodes."""
+"""Complete workflow state shared by the Day 8 LangGraph nodes."""
 
 from typing import Literal, TypedDict
 from uuid import uuid4

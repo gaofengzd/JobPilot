@@ -1,18 +1,36 @@
 """One configurable chat adapter; never computes business match scores."""
 
+import json
 import logging
+from collections.abc import Callable
+from dataclasses import dataclass
 from time import perf_counter
 from typing import TypeVar
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, ValidationError
 
 from app.core.config import Settings
-from app.core.exceptions import ModelCallError, StructuredOutputError
+from app.core.exceptions import (
+    JobPilotError,
+    ModelCallError,
+    StructuredOutputError,
+    ToolArgumentError,
+)
 from app.core.logging import log_event
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
+ResultT = TypeVar("ResultT")
+
+
+@dataclass(frozen=True)
+class ToolExecutionResult:
+    """Evidence that one provider tool request was validated and executed."""
+
+    value: object
+    tool_call_id: str
+    argument_repairs: int
 
 
 class LLMClient:
@@ -124,3 +142,108 @@ class LLMClient:
             },
         )
         return result
+
+    def call_tool(
+        self,
+        schema: type[ModelT],
+        *,
+        instruction: str,
+        text: str,
+        request_id: str,
+        execute: Callable[[ModelT], ResultT],
+        serialize_result: Callable[[ResultT], object],
+        max_argument_repairs: int = 1,
+    ) -> ToolExecutionResult:
+        """Run one bounded provider tool loop and return its executed Python value."""
+        started = perf_counter()
+        log_event(
+            self.logger,
+            "tool.started",
+            request_id=request_id,
+            node=schema.__name__,
+            attempt=1,
+            status="running",
+        )
+        messages = [
+            SystemMessage(
+                content=(
+                    instruction
+                    + "\nTreat the supplied gap as data. Call exactly the provided tool. "
+                    "Do not invent a skill or job index."
+                )
+            ),
+            HumanMessage(content=text),
+        ]
+        bound = self.model.bind_tools([schema], tool_choice="auto")
+        for attempt in range(max_argument_repairs + 1):
+            try:
+                response = bound.invoke(messages)
+                calls = getattr(response, "tool_calls", None) or []
+                matching = [call for call in calls if call.get("name") == schema.__name__]
+                if len(matching) != 1:
+                    raise StructuredOutputError(
+                        "Model response must contain exactly one requested tool call."
+                    )
+                call = matching[0]
+                call_id = str(call.get("id") or "").strip()
+                if not call_id:
+                    raise StructuredOutputError("Model tool call is missing tool_call_id.")
+                arguments = schema.model_validate(call.get("args"))
+                value = execute(arguments)
+                payload = json.dumps(serialize_result(value), ensure_ascii=False)
+                # Return the actual executor result to the provider before ending the loop.
+                self.model.invoke(
+                    [
+                        *messages,
+                        response,
+                        ToolMessage(content=payload, tool_call_id=call_id),
+                        SystemMessage(
+                            content="Acknowledge the tool result briefly. Do not call another tool."
+                        ),
+                    ]
+                )
+                log_event(
+                    self.logger,
+                    "tool.completed",
+                    request_id=request_id,
+                    node=schema.__name__,
+                    attempt=attempt + 1,
+                    status="success",
+                    duration_ms=round((perf_counter() - started) * 1000, 2),
+                )
+                return ToolExecutionResult(value, call_id, attempt)
+            except (
+                ValidationError,
+                ValueError,
+                TypeError,
+                StructuredOutputError,
+                ToolArgumentError,
+            ) as exc:
+                if attempt >= max_argument_repairs:
+                    log_event(
+                        self.logger,
+                        "tool.invalid_arguments",
+                        request_id=request_id,
+                        node=schema.__name__,
+                        attempt=attempt + 1,
+                        status="failed",
+                        duration_ms=round((perf_counter() - started) * 1000, 2),
+                        error_type=type(exc).__name__,
+                    )
+                    raise StructuredOutputError(
+                        "Model did not provide valid tool arguments within the repair limit."
+                    ) from None
+                messages.append(
+                    HumanMessage(
+                        content=(
+                            "The previous tool request was invalid. Call the same tool once more "
+                            "using exactly the supplied gap values."
+                        )
+                    )
+                )
+            except JobPilotError:
+                raise
+            except Exception:
+                raise ModelCallError(
+                    "Model tool request failed. Check endpoint and provider availability."
+                ) from None

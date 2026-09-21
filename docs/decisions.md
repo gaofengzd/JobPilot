@@ -225,3 +225,19 @@
 - 决策：JD 串行解析并保留原始索引；单条已知失败写入 job_errors。selected_job_index 失败时不选择替代岗位。学习分支只在存在所选岗位 Gap 且 need_advice=true 时执行，Retriever 延迟创建并在单次依赖容器中缓存。
 - 原因：避免岗位错位、详情混用和无必要的 BGE/FAISS 加载。
 - 影响：部分岗位失败返回 partial，全部核心岗位失败返回 failed；Day 8 再加入异常修复、Reflection 和工具调用，不在 Day 7 提前实现。
+
+## ADR-024：真实 Tool Calling 只用于学习检索分支
+
+- 日期：2026-09-21
+- 状态：已采用
+- 决策：固定 Graph 主干直接调用薄 Tool/业务模块；只有学习分支由 GLM 请求 `retrieve_knowledge_tool`。参数必须等于 selected job 的现有 Gap，最多一次参数修复；执行结果用原 tool_call_id 返回模型后结束，不开放任意工具循环。
+- 原因：满足文档的真实 Tool Calling 演示，同时避免模型重新决定评分、统计或整个工作流。
+- 影响：真实启用建议会为每个 Gap 增加工具请求及结果确认调用；离线工作流直接执行同一 Tool。公共 Schema 无迁移。
+
+## ADR-025：Reflection 使用确定性规则和两次局部修复
+
+- 日期：2026-09-21
+- 状态：已采用
+- 决策：Reflection 由 Python 检查 Match/JD 分区、Gap 依据、候选人证据和学习 chunk；按第一个问题模块局部重建，整个请求最多两次。超过上限后删除未通过的建议，保留可验证结果并标 partial。
+- 原因：事实一致性属于规则验证，不应交给模型主观自评；有限环防止无限重试和成本失控。
+- 影响：启用既有 State 运行字段，不增加公共 Schema；持续基础设施错误仍明确失败或 partial，不通过改规则放行。

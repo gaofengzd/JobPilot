@@ -1,9 +1,9 @@
 # 开发进度
 
 更新时间：2026-09-21
-当前迭代：Day 7
-版本：0.4（LangGraph 主干工作流）
-状态：Day 7 实现完成；State、Node、Edge 与 v0.4 离线工作流演示验证通过。
+当前迭代：Day 8
+版本：0.5（Tool Calling、Reflection 与受控修复）
+状态：Day 8 实现完成；真实服务验证结果见文末，离线结果单独记录。
 落地目标：E:/00project/02agent/JobPilot
 
 ## 分部分记录
@@ -308,3 +308,38 @@ Day 7 实现完整 LangGraph State、Node、Edge，将前六天模块串成 Work
 ## 下一次唯一目标
 
 Day 8 实现受控 retrieve_knowledge_tool 调用、明确条件边、Reflection、最多 2 次业务修复和终止状态；故障注入必须可定位并返回 partial/failed。
+
+## Day 8 Tool Calling、Reflection 与受控修复
+
+### 已完成
+
+- 5 个 Tool 均使用 Pydantic 参数和结构化返回，并只包装 ResumeParser、JDAnalyzer、MatchingEngine、KnowledgeRetriever、BatchAnalyzer，不复制业务计算。
+- 真实学习分支要求模型生成 `retrieve_knowledge_tool` 请求；Python 将参数限制到当前 selected job 与已验证 Gap，执行结果通过原 tool_call_id 返回模型。
+- 工具参数最多修复一次；检索或服务错误被定位到具体 Gap，不进入任意工具循环。
+- 新增确定性 Reflection，检查岗位技能分区、Gap 的 JD 依据、简历建议候选人证据、学习任务 Gap 与 chunk 来源。
+- 新增 reflection → repair_outputs → reflection 条件环；只重建问题模块，业务修复最多 2 次。
+- 两次修复后仍失败时删除未通过的建议产物，保留其他可验证结果并生成 partial FinalReport。
+- JobPilotState 与公共 Pydantic Schema 未修改；启用既有 retry_count、repair_target、validation_issues 字段。
+- 新增 --demo-v05、6 条 eval 案例和 5 个 Day 8 专项测试。
+
+### 实际验证
+
+- 隔离副本完整离线回归：155 passed；Ruff 检查和格式检查通过。
+- --demo-v05 通过真实编译的 LangGraph，Reflection 无问题、retry_count=0、FinalReport=success。
+- 离线测试与 --demo-v05 使用确定性适配器，不是 GLM、真实 Tool Calling 或 BGE 验证。
+- 正式目录完整离线回归：155 passed；pytest 仅有既有 .pytest_cache 权限 warning，不影响用例结果。
+- 正式目录 Ruff 无缓存检查通过，68 个文件格式检查通过；--demo-v05 返回 success、retry_count=0、validation_issues=[]。
+- 真实 --run-workflow 验证通过：GLM-4.7 完成简历/JD 两次结构化调用，并为 Redis、Docker 两个 Gap 分别成功请求 retrieve_knowledge_tool；两个工具请求均为 attempt=1。
+- 工具执行真实加载本地 bge-large-zh-v1.5 并使用 FAISS；Docker 生成引用 docker:0 的任务，Redis 保持知识不足 warning；Reflection 无问题，最终 FinalReport=success。
+- 第一次受限网络运行在简历调用阶段返回 ModelCallError，未记为通过；允许联网后的完整运行成功。上述真实结果不是 mock。
+
+### 限制
+
+- LearningPlanner 与 ResumeOptimizer 仍使用可验证的确定性模板；模型只负责学习检索 Tool 请求，不负责评分或 Reflection。
+- 工具结果回传后的模型回复不作为事实结果保存；最终学习任务仍由 LearningPlanner 根据检索 chunk 生成。
+- 业务修复只覆盖结构化产物；基础设施长期不可用不会通过重试伪装成功。
+- 统一请求墙钟预算、Day 9 全量 Evaluation、API 和 UI 尚未实现。
+
+## 下一次唯一目标
+
+Day 9 完成可复现 Evaluation：汇总抽取、匹配、RAG、Tool Calling 与 Reflection 指标，输出 v0.6 报告；不提前开发 API/UI。

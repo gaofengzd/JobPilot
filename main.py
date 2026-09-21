@@ -57,6 +57,11 @@ def main() -> int:
         help="Run the real workflow: first path is a resume, remaining paths are JDs",
     )
     actions.add_argument(
+        "--demo-v05",
+        action="store_true",
+        help="Run the offline Day 8 Tool/Reflection workflow demonstration",
+    )
+    actions.add_argument(
         "--demo-v04",
         action="store_true",
         help="Run the offline Day 7 LangGraph workflow demonstration",
@@ -150,7 +155,7 @@ def main() -> int:
             result = build_default_workflow(settings).invoke(state)
             print(result["final_report"].model_dump_json(indent=2))
             return 0
-        if args.demo_v04:
+        if args.demo_v05 or args.demo_v04:
             state = create_initial_state(
                 resume_text="Built a Python API with FastAPI",
                 raw_jobs=["backend", "agent"],
@@ -164,8 +169,10 @@ def main() -> int:
                 json.dumps(
                     {
                         "mode": "offline-synthetic",
-                        "version": "0.4",
+                        "version": "0.5" if args.demo_v05 else "0.4",
                         "graph_status": result["status"],
+                        "retry_count": result["retry_count"],
+                        "validation_issues": result["validation_issues"],
                         "report": report.model_dump(),
                     },
                     ensure_ascii=False,

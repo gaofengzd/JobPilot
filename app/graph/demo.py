@@ -1,4 +1,4 @@
-"""Deterministic adapters for the offline Day 7 graph demonstration."""
+"""Deterministic adapters for the offline Day 8 graph demonstration."""
 
 from app.agents.gap_analyzer import GapAnalyzer
 from app.agents.learning_planner import LearningPlanner

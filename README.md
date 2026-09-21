@@ -2,7 +2,7 @@
 
 智能求职岗位分析 Agent。项目事实来源：[开发文档](docs/开发文档.md)。
 
-当前迭代：**Day 7 LangGraph Workflow**。前六天模块已接入 State、Node、Edge 工作流；Tool Calling、Retry、Reflection、API 和 UI 尚未实现。
+当前迭代：**Day 8 Tool Calling、Reflection 与受控修复**。Graph 已能执行学习检索工具调用、事实规则检查和最多两次局部修复；API 和 UI 尚未实现。
 GLM-4.7 已用三份合成简历和十条合成 JD 完成真实结构化调用验证；离线测试与真实服务结果分开记录。
 
 ## uv 环境与依赖
@@ -64,9 +64,11 @@ uv run --locked python main.py --check-llm
 - app/agents/resume_optimizer.py：只根据候选人证据生成最小措辞建议。
 - app/services/embedding.py：从固定本地路径加载 bge-large-zh-v1.5，无网络下载。
 - tests：契约、基础设施、解析、匹配、Gap、批量统计和 RAG 离线测试。
-- eval/datasets：持续积累抽取、匹配、批量、RAG 和失败案例。
+- app/tools：5 个带 Pydantic 参数的薄 Tool；计算与检索仍由既有业务模块执行。
+- app/agents/reflection.py：按固定事实规则定位 Match、Gap、简历建议和学习来源问题。
+- eval/datasets：持续积累抽取、匹配、批量、RAG、工作流和失败案例。
 
-模型计分、事实 Reflection、工具执行循环与整个请求时间预算不在此阶段实现。
+模型不负责计分或事实 Reflection。整个请求的统一墙钟时间预算尚未实现。
 Dockerfile、API、UI 和后续模块仅占位。
 
 ## 协作与记录
@@ -164,3 +166,14 @@ RAG 仅用于 Gap 到学习建议。人工维护的 Markdown/TXT 资料经过确
     uv run --locked python main.py --run-workflow data/sample_resumes/candidate_backend.md data/sample_jobs/backend-python.txt
 
 --demo-v04 是不调用模型和 Embedding 的合成离线 Graph 演示。--run-workflow 使用已配置 GLM、本地 BGE 和知识库执行真实工作流；可附加 --selected-job-index N 或 --no-advice。
+
+## Day 8 Tool Calling、Reflection 与修复
+
+主干仍由 Graph 固定控制。学习分支中，真实工作流让 GLM 根据已验证 Gap 请求 `retrieve_knowledge_tool`；Python 校验参数、执行本地 BGE/FAISS 检索，并用同一 `tool_call_id` 将结果返回模型。参数最多修复一次，不允许开放工具循环。离线演示直接执行同一 Tool，不伪装为模型调用。
+
+Reflection 使用 Python 规则依次检查匹配分区、Gap 的 JD 依据、简历建议的候选人证据和学习任务来源。只重建有问题的产物，整个请求最多修复两次；仍不合格时删除未通过的建议并返回 partial。
+
+    uv run --locked python main.py --demo-v05
+    uv run --locked python main.py --run-workflow data/sample_resumes/candidate_backend.md data/sample_jobs/backend-python.txt
+
+`--demo-v05` 是确定性离线验证。`--run-workflow` 才会使用已配置 GLM 进行真实 Tool Calling，并加载本地 BGE/FAISS。

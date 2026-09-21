@@ -6,6 +6,7 @@ from typing import Protocol
 
 from app.agents.gap_analyzer import GapAnalyzer
 from app.agents.learning_planner import LearningPlanner
+from app.agents.reflection import Reflection, repair_target
 from app.agents.resume_optimizer import ResumeOptimizer
 from app.business.batch_analyzer import BatchAnalyzer
 from app.core.exceptions import JobPilotError
@@ -17,6 +18,7 @@ from app.schemas.job import JobProfile
 from app.schemas.learning import RetrievedDocument
 from app.schemas.match import MatchResult
 from app.schemas.report import FinalReport
+from app.tools.retrieval_tool import DirectKnowledgeTool, KnowledgeToolLike, RetrieveKnowledgeTool
 from app.utils.resume_files import ResumeDocument, load_resume
 
 
@@ -56,6 +58,10 @@ class WorkflowDependencies:
     resume_optimizer: ResumeOptimizer
     retriever: GapRetrieverLike | None = None
     retriever_factory: Callable[[], GapRetrieverLike] | None = None
+    knowledge_tool: KnowledgeToolLike | None = None
+    knowledge_tool_factory: Callable[[], KnowledgeToolLike] | None = None
+    reflection: Reflection | None = None
+    max_repair_attempts: int = 2
 
     def get_retriever(self) -> GapRetrieverLike:
         if self.retriever is None:
@@ -63,6 +69,21 @@ class WorkflowDependencies:
                 raise RuntimeError("Learning retrieval is not configured.")
             self.retriever = self.retriever_factory()
         return self.retriever
+
+    def get_knowledge_tool(self) -> KnowledgeToolLike:
+        if self.knowledge_tool is None:
+            if self.knowledge_tool_factory is not None:
+                self.knowledge_tool = self.knowledge_tool_factory()
+            else:
+                self.knowledge_tool = DirectKnowledgeTool(
+                    RetrieveKnowledgeTool(self.get_retriever())
+                )
+        return self.knowledge_tool
+
+    def get_reflection(self) -> Reflection:
+        if self.reflection is None:
+            self.reflection = Reflection()
+        return self.reflection
 
 
 class WorkflowNodes:
@@ -144,12 +165,25 @@ class WorkflowNodes:
         }
 
     def retrieve_knowledge(self, state: JobPilotState) -> dict[str, object]:
-        retriever = self.dependencies.get_retriever()
+        selected = state["selected_job_index"]
+        if selected is None:
+            return {"retrieved_context": []}
+        tool = self.dependencies.get_knowledge_tool()
         documents: dict[str, RetrievedDocument] = {}
+        errors = list(state["errors"])
         for gap in state["skill_gaps"]:
-            for document in retriever.retrieve(gap):
+            try:
+                results = tool.retrieve(
+                    gap,
+                    job_index=selected,
+                    request_id=state["request_id"],
+                )
+            except JobPilotError as exc:
+                errors.append(f"retrieve_knowledge_tool:{gap.skill}: {exc}")
+                continue
+            for document in results:
                 documents.setdefault(document.chunk_id, document)
-        return {"retrieved_context": list(documents.values())}
+        return {"retrieved_context": list(documents.values()), "errors": errors}
 
     def create_learning_plan(self, state: JobPilotState) -> dict[str, object]:
         selected = state["selected_job_index"]
@@ -175,6 +209,82 @@ class WorkflowNodes:
                 state["skill_gaps"],
             )
         }
+
+    def reflect(self, state: JobPilotState) -> dict[str, object]:
+        issues = self.dependencies.get_reflection().validate(state)
+        return {
+            "validation_issues": issues,
+            "repair_target": repair_target(issues),
+        }
+
+    def repair_outputs(self, state: JobPilotState) -> dict[str, object]:
+        target = state["repair_target"]
+        updates: dict[str, object] = {"retry_count": state["retry_count"] + 1}
+        selected = state["selected_job_index"]
+        jobs = {job.job_index: job for job in state["job_profiles"]}
+        if target == "match_results":
+            updates["match_results"] = [
+                self.dependencies.matching_engine.match(_require_candidate(state), job)
+                for job in state["job_profiles"]
+            ]
+        if target in {"match_results", "skill_gaps"} and selected in jobs:
+            matches = {
+                item.job_index: item
+                for item in updates.get("match_results", state["match_results"])
+            }
+            updates["skill_gaps"] = self.dependencies.gap_analyzer.analyze(
+                jobs[selected], matches[selected]
+            )
+        effective_gaps = updates.get("skill_gaps", state["skill_gaps"])
+        if target in {"match_results", "skill_gaps", "learning_plan"} and selected is not None:
+            updates["learning_plan"] = self.dependencies.learning_planner.plan(
+                job_index=selected,
+                gaps=effective_gaps,
+                documents=state["retrieved_context"],
+            )
+        if (
+            target
+            in {
+                "match_results",
+                "skill_gaps",
+                "resume_suggestions",
+            }
+            and selected in jobs
+        ):
+            updates["resume_suggestions"] = self.dependencies.resume_optimizer.optimize(
+                _require_candidate(state), jobs[selected], effective_gaps
+            )
+        return updates
+
+    def finalize_reflection_failure(self, state: JobPilotState) -> dict[str, object]:
+        target = state["repair_target"]
+        updates: dict[str, object] = {
+            "errors": [
+                *state["errors"],
+                "Reflection remained invalid after "
+                f"{state['retry_count']} repairs: " + "; ".join(state["validation_issues"]),
+            ]
+        }
+        if target == "match_results":
+            updates.update(
+                match_results=[],
+                skill_gaps=[],
+                retrieved_context=[],
+                learning_plan=None,
+                resume_suggestions=[],
+            )
+        elif target == "skill_gaps":
+            updates.update(
+                skill_gaps=[],
+                retrieved_context=[],
+                learning_plan=None,
+                resume_suggestions=[],
+            )
+        elif target == "learning_plan":
+            updates["learning_plan"] = None
+        elif target == "resume_suggestions":
+            updates["resume_suggestions"] = []
+        return updates
 
     def build_final_report(self, state: JobPilotState) -> dict[str, object]:
         candidate = state["candidate_profile"]

@@ -43,3 +43,7 @@ class BatchAnalysisError(JobPilotError):
 
 class RetrievalError(JobPilotError):
     """Knowledge loading, indexing, or retrieval failed safely."""
+
+
+class ToolArgumentError(JobPilotError):
+    """A model tool request does not match the graph-approved inputs."""

@@ -405,5 +405,33 @@
       "need_advice": false
     },
     "expected": "retrieval not called"
+  },
+  {
+    "id": "day8-tool-argument-drift",
+    "category": "tool_calling",
+    "input": {
+      "gap": "Docker",
+      "tool_skill": "Kubernetes"
+    },
+    "expected": "one bounded argument repair, then ToolArgumentError"
+  },
+  {
+    "id": "day8-reflection-persistent-invalid-source",
+    "category": "reflection",
+    "input": {
+      "source_chunk_ids": [
+        "unknown:0"
+      ]
+    },
+    "expected": "two repairs, prune learning plan, partial report"
+  },
+  {
+    "id": "day8-retrieval-tool-failure",
+    "category": "tool_calling",
+    "input": {
+      "retriever": "failure",
+      "gap": "Docker"
+    },
+    "expected": "localized error and partial report without unsupported task"
   }
 ]
