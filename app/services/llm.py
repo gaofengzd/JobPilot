@@ -192,7 +192,7 @@ class LLMClient:
                 value = execute(arguments)
                 payload = json.dumps(serialize_result(value), ensure_ascii=False)
                 # Return the actual executor result to the provider before ending the loop.
-                self.model.invoke(
+                acknowledgement = self.model.invoke(
                     [
                         *messages,
                         response,
@@ -202,6 +202,7 @@ class LLMClient:
                         ),
                     ]
                 )
+                usage = _merge_usage(response, acknowledgement)
                 log_event(
                     self.logger,
                     "tool.completed",
@@ -210,6 +211,7 @@ class LLMClient:
                     attempt=attempt + 1,
                     status="success",
                     duration_ms=round((perf_counter() - started) * 1000, 2),
+                    **usage,
                 )
                 return ToolExecutionResult(value, call_id, attempt)
             except (
@@ -247,3 +249,16 @@ class LLMClient:
                 raise ModelCallError(
                     "Model tool request failed. Check endpoint and provider availability."
                 ) from None
+
+
+def _merge_usage(*responses: object) -> dict[str, int]:
+    fields = ("input_tokens", "output_tokens", "total_tokens")
+    totals = {field: 0 for field in fields}
+    found = False
+    for response in responses:
+        usage = getattr(response, "usage_metadata", None) or {}
+        for field in fields:
+            if field in usage:
+                totals[field] += int(usage[field])
+                found = True
+    return totals if found else {}

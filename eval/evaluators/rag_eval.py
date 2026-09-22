@@ -39,3 +39,17 @@ def evaluate_hit_at_k(
         "value": hits / total if total else 0.0,
         "cases": results,
     }
+
+
+def evaluate_citation_support(cases: list[dict]) -> dict[str, object]:
+    """Aggregate human labels; this does not infer support from lexical overlap."""
+    checked = len(cases)
+    supported = sum(case["supported"] is True for case in cases)
+    unsupported = [case["id"] for case in cases if case["supported"] is not True]
+    return {
+        "metric": "Citation Support",
+        "supported": supported,
+        "checked": checked,
+        "value": supported / checked if checked else 0.0,
+        "unsupported_case_ids": unsupported,
+    }

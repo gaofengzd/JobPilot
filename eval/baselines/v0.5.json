@@ -1,0 +1,14 @@
+{
+  "name": "documented-v0.5-baseline",
+  "provenance": "docs/progress.md Day 6-Day 8 recorded results",
+  "metrics": {
+    "rag_hit_at_1": 1.0,
+    "rag_hit_at_4": 1.0,
+    "matching_exact_case_rate": 1.0,
+    "workflow_live_success_rate": 1.0
+  },
+  "notes": [
+    "RAG baseline contains five fixed human-labeled queries.",
+    "Workflow baseline contains one documented real Day 8 request and is not a general reliability estimate."
+  ]
+}

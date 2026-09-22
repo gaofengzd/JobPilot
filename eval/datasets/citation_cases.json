@@ -1,0 +1,37 @@
+[
+  {
+    "id": "docker-task-docker-0",
+    "task_skill": "Docker",
+    "source_chunk_id": "docker:0",
+    "supported": true,
+    "rationale": "The source explains Docker images and a containerization practice task."
+  },
+  {
+    "id": "fastapi-task-fastapi-0",
+    "task_skill": "FastAPI",
+    "source_chunk_id": "fastapi:0",
+    "supported": true,
+    "rationale": "The source explains FastAPI validation, dependency injection, and an API exercise."
+  },
+  {
+    "id": "langgraph-task-langgraph-0",
+    "task_skill": "LangGraph",
+    "source_chunk_id": "langgraph:0",
+    "supported": true,
+    "rationale": "The source covers state, nodes, conditional routing, and bounded retry."
+  },
+  {
+    "id": "postgresql-task-postgresql-0",
+    "task_skill": "PostgreSQL",
+    "source_chunk_id": "postgresql:0",
+    "supported": true,
+    "rationale": "The source covers indexes, EXPLAIN ANALYZE, and a verifiable exercise."
+  },
+  {
+    "id": "rag-task-rag-0",
+    "task_skill": "RAG",
+    "source_chunk_id": "rag:0",
+    "supported": true,
+    "rationale": "The source covers a traceable RAG pipeline and Hit@K evaluation."
+  }
+]

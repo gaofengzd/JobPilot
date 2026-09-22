@@ -1,6 +1,7 @@
 """Read supported resumes without OCR or arbitrary format guessing."""
 
 from dataclasses import dataclass
+from io import BytesIO
 from pathlib import Path
 
 from pypdf import PdfReader
@@ -47,6 +48,28 @@ def load_resume(path: str | Path) -> ResumeDocument:
     return _load_pdf(file_path) if suffix == ".pdf" else _load_text(file_path)
 
 
+def load_resume_bytes(filename: str, data: bytes) -> ResumeDocument:
+    """Parse an authorized upload entirely in memory; never accept a server path."""
+    safe_name = Path(filename or "").name
+    if not safe_name or safe_name in {".", ".."}:
+        raise ResumeReadError("Resume upload must include a filename.")
+    suffix = Path(safe_name).suffix.casefold()
+    if suffix not in SUPPORTED_SUFFIXES:
+        raise ResumeReadError("Unsupported resume format. Use PDF, Markdown, or TXT.")
+    if not data:
+        raise ResumeReadError("Resume file is empty.")
+    if len(data) > MAX_RESUME_BYTES:
+        raise ResumeReadError("Resume file exceeds the 5 MB limit.")
+    path = Path(safe_name)
+    if suffix == ".pdf":
+        return _load_pdf_stream(path, BytesIO(data))
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise ResumeReadError("Resume text must use UTF-8 encoding.") from None
+    return _build_document(path, (("line", text),))
+
+
 def _load_text(path: Path) -> ResumeDocument:
     try:
         text = path.read_text(encoding="utf-8-sig")
@@ -59,7 +82,16 @@ def _load_text(path: Path) -> ResumeDocument:
 
 def _load_pdf(path: Path) -> ResumeDocument:
     try:
-        reader = PdfReader(path)
+        return _load_pdf_stream(path, path)
+    except ResumeReadError:
+        raise
+    except Exception:
+        raise ResumeReadError("PDF resume could not be parsed.") from None
+
+
+def _load_pdf_stream(path: Path, source: Path | BytesIO) -> ResumeDocument:
+    try:
+        reader = PdfReader(source)
         if reader.is_encrypted:
             raise ResumeReadError("Encrypted PDF resumes are not supported.")
         pages = [

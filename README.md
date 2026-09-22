@@ -2,7 +2,7 @@
 
 智能求职岗位分析 Agent。项目事实来源：[开发文档](docs/开发文档.md)。
 
-当前迭代：**Day 8 Tool Calling、Reflection 与受控修复**。Graph 已能执行学习检索工具调用、事实规则检查和最多两次局部修复；API 和 UI 尚未实现。
+当前迭代：**Day 10 FastAPI / v0.7**。已有四个复用现有业务与 LangGraph 的 API、受控上传、明确错误映射，以及 Day 9 的可复现评测基线；UI 尚未实现。
 GLM-4.7 已用三份合成简历和十条合成 JD 完成真实结构化调用验证；离线测试与真实服务结果分开记录。
 
 ## uv 环境与依赖
@@ -66,10 +66,11 @@ uv run --locked python main.py --check-llm
 - tests：契约、基础设施、解析、匹配、Gap、批量统计和 RAG 离线测试。
 - app/tools：5 个带 Pydantic 参数的薄 Tool；计算与检索仍由既有业务模块执行。
 - app/agents/reflection.py：按固定事实规则定位 Match、Gap、简历建议和学习来源问题。
+- app/api：FastAPI 应用、四个业务端点、进程内共享依赖、受控上传和异常映射。
 - eval/datasets：持续积累抽取、匹配、批量、RAG、工作流和失败案例。
 
 模型不负责计分或事实 Reflection。整个请求的统一墙钟时间预算尚未实现。
-Dockerfile、API、UI 和后续模块仅占位。
+Dockerfile、UI 和后续模块仅占位。
 
 ## 协作与记录
 
@@ -177,3 +178,28 @@ Reflection 使用 Python 规则依次检查匹配分区、Gap 的 JD 依据、�
     uv run --locked python main.py --run-workflow data/sample_resumes/candidate_backend.md data/sample_jobs/backend-python.txt
 
 `--demo-v05` 是确定性离线验证。`--run-workflow` 才会使用已配置 GLM 进行真实 Tool Calling，并加载本地 BGE/FAISS。
+
+## Day 9 Evaluation 与 v0.6
+
+评测器读取人工期望，不把当前模型输出写回标准答案。三个模式分别用于纯 Python、真实本地 BGE，以及真实 GLM + BGE + Tool/Workflow；报告同时生成 JSON 和 Markdown。
+
+    uv run --locked python -m eval.run_eval --mode deterministic --output-prefix eval/reports/day9-deterministic
+    uv run --locked python -m eval.run_eval --mode local --output-prefix eval/reports/day9-local
+    uv run --locked python -m eval.run_eval --mode full --output-prefix eval/reports/day9-v0.6
+
+`full` 会产生真实模型费用并耗时数分钟。当前正式报告位于 `eval/reports/day9-v0.6.{json,md}`。一次完整运行不代表长期可靠性；首轮真实运行出现 1 条 grounding 失败，完整复跑为 13/13 首次结构化有效，该差异已保留为失败分析。
+
+## Day 10 FastAPI
+
+四个接口使用同一套核心 Schema、业务模块和 LangGraph 工作流，不在 API 层重新计算匹配或统计：
+
+- `POST /resume/parse`：上传 UTF-8 Markdown/TXT 或文本层 PDF，返回 `CandidateProfile`；单文件上限 5 MB。
+- `POST /jobs/analyze`：提交 `jd_text` 和可选 `job_index`，返回 `JobProfile`。
+- `POST /jobs/batch`：提交 `CandidateProfile` 与 JD 列表，返回成功岗位、匹配结果、批量统计和逐岗位错误。
+- `POST /agent/run`：提交 `AgentInput`，运行完整 Graph 并返回 `FinalReport`。
+
+```powershell
+uv run --locked uvicorn app.api.main:app --host 127.0.0.1 --port 8000
+```
+
+启动后访问 `http://127.0.0.1:8000/docs` 查看交互式接口文档。模型、Embedding、知识库和批量上限继续使用 `.env` 中的现有配置。上传内容在内存中解析，客户端文件名只作为安全的来源标识，不会被当作服务器路径。

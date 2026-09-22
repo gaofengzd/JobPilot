@@ -1,9 +1,9 @@
 # 开发进度
 
-更新时间：2026-09-21
-当前迭代：Day 8
-版本：0.5（Tool Calling、Reflection 与受控修复）
-状态：Day 8 实现完成；真实服务验证结果见文末，离线结果单独记录。
+更新时间：2026-09-22
+当前迭代：Day 10
+版本：0.7（FastAPI 接口基线）
+状态：Day 10 实现完成；离线回归和真实 Uvicorn + GLM 接口验证均已执行。
 落地目标：E:/00project/02agent/JobPilot
 
 ## 分部分记录
@@ -343,3 +343,73 @@ Day 8 实现受控 retrieve_knowledge_tool 调用、明确条件边、Reflection
 ## 下一次唯一目标
 
 Day 9 完成可复现 Evaluation：汇总抽取、匹配、RAG、Tool Calling 与 Reflection 指标，输出 v0.6 报告；不提前开发 API/UI。
+
+## Day 9 Evaluation 与 v0.6
+
+### 已完成
+
+- 实现统一评测入口，支持 deterministic、local、full 三种模式，输出 UTF-8 JSON 和 Markdown。
+- 基础样本达到规定的 33 条：3 Resume、10 JD、10 Matching、5 RAG、5 Error；另保留 Batch、Workflow、Citation 和累计失败回归。
+- JD required/preferred 独立计算 Precision、Recall、F1 和混淆案例；Resume 按 skills/project/school 计算集合指标。
+- Matching 使用真实业务模块计算集合 Precision/Recall、coverage MAE 和逐案例失败；未复制评分规则。
+- RAG 使用本地 bge-large-zh-v1.5 + FAISS 计算 Hit@1/Hit@4；Citation Support 聚合 5 条人工标签。
+- Structured Output、Tool Success、Workflow Success、延迟和 provider 可用 token 分开记录；无可信价格配置时成本为 null。
+- 保存 v0.5 已记录基线、逐指标 delta、当前失败列表和 4 个带来源的失败案例分析。
+- 新增 3 条 Matching 人工案例、Day 9 真实 grounding 失败回归和 6 个 Evaluation 专项测试。
+- 公共 Schema、Graph 和匹配评分公式未修改；无新依赖。
+
+### 实际验证
+
+- 隔离副本完整离线回归：164 passed；正式目录使用独立可写 basetemp 同样为 164 passed。Ruff 检查和 69 个文件格式检查通过。
+- deterministic：33 条基础口径成立，Matching 10/10、P=1.0、R=1.0、coverage MAE=0，无 LLM/BGE 调用。
+- local 真实加载本地 bge-large-zh-v1.5：Hit@1=5/5、Hit@4=5/5；Citation Support 人工标签=5/5；reranker 未使用。
+- 首次 full 真实 GLM-4.7：Resume 3/3，JD 9/10；data-engineer 输出无原文支持的 data qualityB，被 JobGroundingError 阻断；首次结构化有效 12/13。该结果未记为全通过，已加入 eval。
+- 修复评测日志计数后完整复跑：Resume 3/3，JD 10/10，required/preferred P/R/F1 均 1.0；首次结构化有效 13/13。
+- 同次 full：Matching 10/10，RAG Hit@1/Hit@4 均 5/5，Tool Success 2/2，Workflow Success 1/1，最终失败列表为空。
+- 同次 full 平均抽取延迟 16.842 秒，工作流 77.931 秒；provider 可观测 token 为 input 14,586、output 8,055、total 22,641；未计算费用。
+- 正式报告：eval/reports/day9-v0.6.json 与 eval/reports/day9-v0.6.md。上述 full 结果是真实 GLM/BGE 运行，不是 mock。
+
+### 限制
+
+- 10 条 JD、5 条 RAG 和 1 条完整工作流仍是小样本；满分不能外推为生产可靠性。
+- 两次 full 运行从 12/13 变化到 13/13，证明 GLM 输出存在非确定性；严格 grounding 继续作为阻断边界。
+- Tool Success 只有两个实际调用，Workflow Success 只有一个请求。
+- Citation Support 来自 5 条人工标签；不是自动语义判断。
+- bge-reranker-v2-m3 仍未运行，因为固定 RAG 基线未显示排序不足。
+- API、UI、Docker 和统一墙钟时间预算尚未实现。
+
+## 下一次唯一目标
+
+Day 10 实现四个 FastAPI 接口、受控文件上传和明确错误映射；复用现有业务与 Graph，不新建评分或评测逻辑。
+
+## Day 10 FastAPI 与 v0.7
+
+### 已完成
+
+- 增加 FastAPI 应用工厂和 `/resume/parse`、`/jobs/analyze`、`/jobs/batch`、`/agent/run` 四个端点。
+- API 依赖容器复用既有 LLM、Embedding、Parser、业务模块和已编译 Graph；每个 `/agent/run` 请求仍创建独立 State 和 request_id。
+- 上传只接受 `.md`、`.txt`、文本层 `.pdf`，最大 5 MB；在内存中读取，客户端文件名经 basename 处理，不接受任意服务器路径。
+- `/jobs/batch` 保留原始 job_index，单条已知失败写入 job_errors，统计分母继续使用有效岗位；超过配置的 MAX_JOBS 在模型调用前返回 422。
+- `JobPilotError` 映射为受控 JSON：配置问题 503、模型/结构化/grounding 问题 502、上传读取问题 400/413，其余业务错误 500；请求 Schema 错误沿用 FastAPI 422。
+- 仅新增 API transport Schema：JobAnalyzeRequest、JobBatchRequest、JobBatchResponse；CandidateProfile、JobProfile、MatchResult、AgentInput、FinalReport 等公共核心契约未修改，无迁移要求。
+- 新增 FastAPI、Uvicorn、python-multipart 依赖并更新 uv.lock、requirements.txt；新增 11 个 API 测试和 5 条 Day 10 失败/边界案例。
+
+### 实际验证
+
+- 正式目录完整离线回归：175 passed；Ruff 检查通过，72 个 Python 文件格式检查通过。
+- API 测试覆盖四个 OpenAPI 路径、上传边界、批量部分失败、配置上限、请求状态隔离、懒加载依赖及异常映射。测试使用注入式确定性适配器，不是 GLM/BGE 真实验证。
+- 启动真实 Uvicorn 后，`GET /openapi.json` 返回 200，并暴露四个预期路径。
+- 真实 `POST /jobs/analyze` 使用已配置 GLM-4.7：对同一行包含 `Required skills:` / `Preferred skills:` 明示标记的合成 JD 返回 200，得到 5 个必需技能、1 个优先技能和 5 条证据；这是真实模型调用，不是 mock。
+- 真实验证中，标题行后另起项目符号的技能区块两次被既有 Python grounding 安全阻断并返回 502；该结果未记作通过，已加入 `day10-live-multiline-skill-section` eval 案例。
+- Pytest 仍提示 Starlette TestClient 上游弃用 warning，以及项目 `.pytest_cache` 无写权限 warning；使用独立 `--basetemp` 后全部测试完成，不存在跳过失败用例。
+
+### 限制
+
+- Day 3 的 required/preferred grounding 只认可技能与明示标记位于同一行；多行项目符号版式已记录为 eval，未在 Day 10 改变既有抽取语义。
+- API 是同步、有界流程，不含任务队列、认证、限流或统一请求墙钟预算。
+- `/jobs/batch` 的部分失败为业务响应 200；调用方需同时检查 `job_errors` 和 `batch_statistics`。
+- Day 10 未实现 UI、Docker 或部署健康检查，也未对四个端点逐一执行真实模型调用；真实验证覆盖 OpenAPI 和 `/jobs/analyze`。
+
+## 下一次唯一目标
+
+Day 11 按开发文档实现简单 Demo 页面、Docker 和端到端验证；复用当前 API 与业务实现，不在 UI 中新增评分或抽取逻辑。

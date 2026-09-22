@@ -1,51 +1,244 @@
 [
   {
     "id": "exact-required-preferred",
-    "candidate_skills": ["Python", "FastAPI", "Docker"],
-    "required_skills": ["Python", "FastAPI"],
-    "preferred_skills": ["Docker", "Redis"],
-    "expected": {"matched_required": ["Python", "FastAPI"], "missing_required": [], "matched_preferred": ["Docker"], "missing_preferred": ["Redis"], "required_coverage": 1.0, "preferred_coverage": 0.5}
+    "candidate_skills": [
+      "Python",
+      "FastAPI",
+      "Docker"
+    ],
+    "required_skills": [
+      "Python",
+      "FastAPI"
+    ],
+    "preferred_skills": [
+      "Docker",
+      "Redis"
+    ],
+    "expected": {
+      "matched_required": [
+        "Python",
+        "FastAPI"
+      ],
+      "missing_required": [],
+      "matched_preferred": [
+        "Docker"
+      ],
+      "missing_preferred": [
+        "Redis"
+      ],
+      "required_coverage": 1.0,
+      "preferred_coverage": 0.5
+    }
   },
   {
     "id": "explicit-aliases",
-    "candidate_skills": ["python3", "Postgres", "k8s"],
-    "required_skills": ["Python", "PostgreSQL"],
-    "preferred_skills": ["Kubernetes"],
-    "expected": {"matched_required": ["Python", "PostgreSQL"], "missing_required": [], "matched_preferred": ["Kubernetes"], "missing_preferred": [], "required_coverage": 1.0, "preferred_coverage": 1.0}
+    "candidate_skills": [
+      "python3",
+      "Postgres",
+      "k8s"
+    ],
+    "required_skills": [
+      "Python",
+      "PostgreSQL"
+    ],
+    "preferred_skills": [
+      "Kubernetes"
+    ],
+    "expected": {
+      "matched_required": [
+        "Python",
+        "PostgreSQL"
+      ],
+      "missing_required": [],
+      "matched_preferred": [
+        "Kubernetes"
+      ],
+      "missing_preferred": [],
+      "required_coverage": 1.0,
+      "preferred_coverage": 1.0
+    }
   },
   {
     "id": "case-and-whitespace",
-    "candidate_skills": ["  PYTHON  ", "TypeScript"],
-    "required_skills": ["python", "typescript"],
+    "candidate_skills": [
+      "  PYTHON  ",
+      "TypeScript"
+    ],
+    "required_skills": [
+      "python",
+      "typescript"
+    ],
     "preferred_skills": [],
-    "expected": {"matched_required": ["python", "typescript"], "missing_required": [], "matched_preferred": [], "missing_preferred": [], "required_coverage": 1.0, "preferred_coverage": 0.0}
+    "expected": {
+      "matched_required": [
+        "python",
+        "typescript"
+      ],
+      "missing_required": [],
+      "matched_preferred": [],
+      "missing_preferred": [],
+      "required_coverage": 1.0,
+      "preferred_coverage": 0.0
+    }
   },
   {
     "id": "partial-missing",
-    "candidate_skills": ["Python"],
-    "required_skills": ["Python", "SQL", "Airflow"],
-    "preferred_skills": ["dbt"],
-    "expected": {"matched_required": ["Python"], "missing_required": ["SQL", "Airflow"], "matched_preferred": [], "missing_preferred": ["dbt"], "required_coverage": 0.3333333333333333, "preferred_coverage": 0.0}
+    "candidate_skills": [
+      "Python"
+    ],
+    "required_skills": [
+      "Python",
+      "SQL",
+      "Airflow"
+    ],
+    "preferred_skills": [
+      "dbt"
+    ],
+    "expected": {
+      "matched_required": [
+        "Python"
+      ],
+      "missing_required": [
+        "SQL",
+        "Airflow"
+      ],
+      "matched_preferred": [],
+      "missing_preferred": [
+        "dbt"
+      ],
+      "required_coverage": 0.3333333333333333,
+      "preferred_coverage": 0.0
+    }
   },
   {
     "id": "empty-requirements",
-    "candidate_skills": ["Python"],
+    "candidate_skills": [
+      "Python"
+    ],
     "required_skills": [],
     "preferred_skills": [],
-    "expected": {"matched_required": [], "missing_required": [], "matched_preferred": [], "missing_preferred": [], "required_coverage": 0.0, "preferred_coverage": 0.0}
+    "expected": {
+      "matched_required": [],
+      "missing_required": [],
+      "matched_preferred": [],
+      "missing_preferred": [],
+      "required_coverage": 0.0,
+      "preferred_coverage": 0.0
+    }
   },
   {
     "id": "canonical-deduplication",
-    "candidate_skills": ["Python", "python3", "PY"],
-    "required_skills": ["Python", "Python3"],
+    "candidate_skills": [
+      "Python",
+      "python3",
+      "PY"
+    ],
+    "required_skills": [
+      "Python",
+      "Python3"
+    ],
     "preferred_skills": [],
-    "expected": {"matched_required": ["Python"], "missing_required": [], "matched_preferred": [], "missing_preferred": [], "required_coverage": 1.0, "preferred_coverage": 0.0}
+    "expected": {
+      "matched_required": [
+        "Python"
+      ],
+      "missing_required": [],
+      "matched_preferred": [],
+      "missing_preferred": [],
+      "required_coverage": 1.0,
+      "preferred_coverage": 0.0
+    }
   },
   {
     "id": "related-is-not-equivalent",
-    "candidate_skills": ["LangChain"],
-    "required_skills": ["LangGraph"],
+    "candidate_skills": [
+      "LangChain"
+    ],
+    "required_skills": [
+      "LangGraph"
+    ],
     "preferred_skills": [],
-    "expected": {"matched_required": [], "missing_required": ["LangGraph"], "matched_preferred": [], "missing_preferred": [], "required_coverage": 0.0, "preferred_coverage": 0.0}
+    "expected": {
+      "matched_required": [],
+      "missing_required": [
+        "LangGraph"
+      ],
+      "matched_preferred": [],
+      "missing_preferred": [],
+      "required_coverage": 0.0,
+      "preferred_coverage": 0.0
+    }
+  },
+  {
+    "id": "preferred-only",
+    "candidate_skills": [
+      "Docker"
+    ],
+    "required_skills": [],
+    "preferred_skills": [
+      "Docker",
+      "Redis"
+    ],
+    "expected": {
+      "matched_required": [],
+      "missing_required": [],
+      "matched_preferred": [
+        "Docker"
+      ],
+      "missing_preferred": [
+        "Redis"
+      ],
+      "required_coverage": 0.0,
+      "preferred_coverage": 0.5
+    }
+  },
+  {
+    "id": "candidate-duplicate-does-not-inflate",
+    "candidate_skills": [
+      "SQL",
+      "sql",
+      " SQL "
+    ],
+    "required_skills": [
+      "SQL",
+      "Python"
+    ],
+    "preferred_skills": [],
+    "expected": {
+      "matched_required": [
+        "SQL"
+      ],
+      "missing_required": [
+        "Python"
+      ],
+      "matched_preferred": [],
+      "missing_preferred": [],
+      "required_coverage": 0.5,
+      "preferred_coverage": 0.0
+    }
+  },
+  {
+    "id": "dot-and-underscore-normalization",
+    "candidate_skills": [
+      "scikit_learn"
+    ],
+    "required_skills": [
+      "scikit-learn"
+    ],
+    "preferred_skills": [
+      "MLflow"
+    ],
+    "expected": {
+      "matched_required": [
+        "scikit-learn"
+      ],
+      "missing_required": [],
+      "matched_preferred": [],
+      "missing_preferred": [
+        "MLflow"
+      ],
+      "required_coverage": 1.0,
+      "preferred_coverage": 0.0
+    }
   }
 ]

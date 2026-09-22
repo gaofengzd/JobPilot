@@ -1,0 +1,361 @@
+{
+  "report_version": "0.6",
+  "generated_at": "2026-09-22T06:55:15.833879+00:00",
+  "mode": "full",
+  "dataset": {
+    "inventory": {
+      "resume": 3,
+      "jd": 10,
+      "matching": 10,
+      "rag": 5,
+      "citation": 5,
+      "batch": 3,
+      "workflow": 8,
+      "error_regressions": 42
+    },
+    "base_case_count": 33,
+    "base_definition": "3 resume + 10 JD + 10 matching + 5 RAG + 5 error",
+    "expectations": "human-authored synthetic or de-identified labels"
+  },
+  "metrics": {
+    "matching": {
+      "cases": 10,
+      "precision": 1.0,
+      "recall": 1.0,
+      "coverage_mean_absolute_error": 0.0,
+      "exact_cases": 10,
+      "failures": []
+    },
+    "citation_support": {
+      "metric": "Citation Support",
+      "supported": 5,
+      "checked": 5,
+      "value": 1.0,
+      "unsupported_case_ids": []
+    },
+    "rag": {
+      "hit_at_1": {
+        "metric": "Hit@1",
+        "hits": 5,
+        "total": 5,
+        "value": 1.0,
+        "cases": [
+          {
+            "id": "fastapi-dependency-injection",
+            "hit": true,
+            "expected_doc_ids": [
+              "fastapi"
+            ],
+            "retrieved_doc_ids": [
+              "fastapi"
+            ]
+          },
+          {
+            "id": "docker-python-container",
+            "hit": true,
+            "expected_doc_ids": [
+              "docker"
+            ],
+            "retrieved_doc_ids": [
+              "docker"
+            ]
+          },
+          {
+            "id": "langgraph-state-routing",
+            "hit": true,
+            "expected_doc_ids": [
+              "langgraph"
+            ],
+            "retrieved_doc_ids": [
+              "langgraph"
+            ]
+          },
+          {
+            "id": "postgresql-indexes",
+            "hit": true,
+            "expected_doc_ids": [
+              "postgresql"
+            ],
+            "retrieved_doc_ids": [
+              "postgresql"
+            ]
+          },
+          {
+            "id": "rag-citations",
+            "hit": true,
+            "expected_doc_ids": [
+              "rag"
+            ],
+            "retrieved_doc_ids": [
+              "rag"
+            ]
+          }
+        ]
+      },
+      "hit_at_4": {
+        "metric": "Hit@4",
+        "hits": 5,
+        "total": 5,
+        "value": 1.0,
+        "cases": [
+          {
+            "id": "fastapi-dependency-injection",
+            "hit": true,
+            "expected_doc_ids": [
+              "fastapi"
+            ],
+            "retrieved_doc_ids": [
+              "fastapi",
+              "langgraph",
+              "postgresql",
+              "docker"
+            ]
+          },
+          {
+            "id": "docker-python-container",
+            "hit": true,
+            "expected_doc_ids": [
+              "docker"
+            ],
+            "retrieved_doc_ids": [
+              "docker",
+              "fastapi",
+              "postgresql",
+              "langgraph"
+            ]
+          },
+          {
+            "id": "langgraph-state-routing",
+            "hit": true,
+            "expected_doc_ids": [
+              "langgraph"
+            ],
+            "retrieved_doc_ids": [
+              "langgraph",
+              "rag",
+              "postgresql",
+              "fastapi"
+            ]
+          },
+          {
+            "id": "postgresql-indexes",
+            "hit": true,
+            "expected_doc_ids": [
+              "postgresql"
+            ],
+            "retrieved_doc_ids": [
+              "postgresql",
+              "fastapi",
+              "langgraph",
+              "rag"
+            ]
+          },
+          {
+            "id": "rag-citations",
+            "hit": true,
+            "expected_doc_ids": [
+              "rag"
+            ],
+            "retrieved_doc_ids": [
+              "rag",
+              "langgraph",
+              "postgresql",
+              "fastapi"
+            ]
+          }
+        ]
+      }
+    },
+    "resume_extraction": {
+      "cases": 3,
+      "predictions": 3,
+      "exact_cases": 3,
+      "exact_case_rate": 1.0,
+      "fields": {
+        "skills": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "true_positive": 9,
+          "false_positive": 0,
+          "false_negative": 0,
+          "failures": []
+        },
+        "project_names": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "true_positive": 3,
+          "false_positive": 0,
+          "false_negative": 0,
+          "failures": []
+        },
+        "education_schools": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "true_positive": 3,
+          "false_positive": 0,
+          "false_negative": 0,
+          "failures": []
+        }
+      }
+    },
+    "jd_extraction": {
+      "cases": 10,
+      "predictions": 10,
+      "exact_cases": 10,
+      "exact_case_rate": 1.0,
+      "required": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "true_positive": 30,
+        "false_positive": 0,
+        "false_negative": 0,
+        "failures": []
+      },
+      "preferred": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "true_positive": 20,
+        "false_positive": 0,
+        "false_negative": 0,
+        "failures": []
+      },
+      "confusion_cases": []
+    },
+    "structured_output": {
+      "first_schema_valid": 13,
+      "calls": 13,
+      "first_schema_valid_rate": 1.0,
+      "retry_after_failure": "not_run"
+    },
+    "tool_success": {
+      "successful": 2,
+      "actual_calls": 2,
+      "value": 1.0
+    },
+    "workflow": {
+      "success": 1,
+      "partial": 0,
+      "failed": 0,
+      "requests": 1,
+      "success_rate": 1.0
+    }
+  },
+  "runtime": {
+    "mode": "full",
+    "llm_calls_performed": true,
+    "embedding_inference_performed": true,
+    "embedding_model": "bge-large-zh-v1.5",
+    "indexed_chunks": 5,
+    "reranker_used": false,
+    "llm_model": "glm-4.7",
+    "extraction_calls": 13,
+    "extraction_successes": 13,
+    "average_extraction_latency_seconds": 16.841805461561307,
+    "workflow_latency_seconds": 77.93050210014917,
+    "observed_token_usage": {
+      "input_tokens": 14586,
+      "output_tokens": 8055,
+      "total_tokens": 22641
+    },
+    "token_scope": "Only calls whose provider response exposed usage metadata.",
+    "cost": null,
+    "cost_reason": "No reviewed price table is configured."
+  },
+  "baseline": {
+    "name": "documented-v0.5-baseline",
+    "provenance": "docs/progress.md Day 6-Day 8 recorded results",
+    "metrics": {
+      "rag_hit_at_1": 1.0,
+      "rag_hit_at_4": 1.0,
+      "matching_exact_case_rate": 1.0,
+      "workflow_live_success_rate": 1.0
+    },
+    "notes": [
+      "RAG baseline contains five fixed human-labeled queries.",
+      "Workflow baseline contains one documented real Day 8 request and is not a general reliability estimate."
+    ]
+  },
+  "baseline_comparison": {
+    "matching_exact_case_rate": {
+      "baseline": 1.0,
+      "current": 1.0,
+      "delta": 0.0
+    },
+    "rag_hit_at_1": {
+      "baseline": 1.0,
+      "current": 1.0,
+      "delta": 0.0
+    },
+    "rag_hit_at_4": {
+      "baseline": 1.0,
+      "current": 1.0,
+      "delta": 0.0
+    },
+    "workflow_live_success_rate": {
+      "baseline": 1.0,
+      "current": 1.0,
+      "delta": 0.0
+    }
+  },
+  "failures": [],
+  "failure_analyses": [
+    {
+      "id": "glm-string-null",
+      "observed": "GLM-4.7 returned the literal string null for optional JD fields.",
+      "root_cause": "Compatible structured output did not consistently preserve JSON null semantics.",
+      "fix": "Normalize a small allowlist of optional placeholder values only when absent from source text.",
+      "regression": "tests/test_jd_analyzer.py::test_optional_string_null_placeholder_is_normalized",
+      "provenance": "docs/decisions.md ADR-011"
+    },
+    {
+      "id": "windows-unicode-evidence",
+      "observed": "A Unicode arrow in match evidence raised UnicodeEncodeError on a GBK Windows console.",
+      "root_cause": "Machine-generated evidence used a character unsupported by the active console encoding.",
+      "fix": "Use the ASCII <-> separator for generated evidence.",
+      "regression": "matching eval case and Day 4 output test",
+      "provenance": "docs/decisions.md Day 4 Windows output compatibility"
+    },
+    {
+      "id": "glm-intermittent-structured-output",
+      "observed": "A real --analyze-job call returned StructuredOutputError although the same sample later succeeded.",
+      "root_cause": "Provider output was nondeterministic and did not contain exactly one valid schema tool call.",
+      "fix": "Keep strict validation and safe failure; Day 8 added bounded business repair without relaxing the schema.",
+      "regression": "eval/datasets/error_cases.json#day3-live-intermittent-structured-output",
+      "provenance": "docs/decisions.md Day 3 live nondeterminism observation"
+    },
+    {
+      "id": "day9-live-grounding-mutation",
+      "observed": "The first Day 9 full run returned data qualityB for a JD keyword and Python grounding rejected the case; the complete rerun passed 10/10.",
+      "root_cause": "The provider produced a nondeterministic suffix that was absent from the source JD.",
+      "fix": "Keep exact grounding, count the first call as failed, continue the batch, and retain the case for repeatability analysis.",
+      "regression": "eval/datasets/error_cases.json#day9-live-jd-grounding-mutation",
+      "provenance": "Day 9 first full report on 2026-09-22"
+    }
+  ],
+  "duration_seconds": 334.651,
+  "limitations": [
+    "The five-query RAG set is too small to establish broad retrieval quality.",
+    "Citation Support uses stored human labels and does not infer truth from overlap.",
+    "Cost is unknown because no reviewed price table is configured.",
+    "A one-request live workflow rate is evidence of that run, not a reliability claim."
+  ],
+  "repeatability_observations": [
+    {
+      "run": "first-full",
+      "structured_output": "12/13",
+      "jd_exact": "9/10",
+      "failure": "data-engineer grounding rejected unsupported data qualityB"
+    },
+    {
+      "run": "final-full",
+      "structured_output": "13/13",
+      "jd_exact": "10/10",
+      "failure": null
+    }
+  ]
+}

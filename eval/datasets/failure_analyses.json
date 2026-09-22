@@ -1,0 +1,34 @@
+[
+  {
+    "id": "glm-string-null",
+    "observed": "GLM-4.7 returned the literal string null for optional JD fields.",
+    "root_cause": "Compatible structured output did not consistently preserve JSON null semantics.",
+    "fix": "Normalize a small allowlist of optional placeholder values only when absent from source text.",
+    "regression": "tests/test_jd_analyzer.py::test_optional_string_null_placeholder_is_normalized",
+    "provenance": "docs/decisions.md ADR-011"
+  },
+  {
+    "id": "windows-unicode-evidence",
+    "observed": "A Unicode arrow in match evidence raised UnicodeEncodeError on a GBK Windows console.",
+    "root_cause": "Machine-generated evidence used a character unsupported by the active console encoding.",
+    "fix": "Use the ASCII <-> separator for generated evidence.",
+    "regression": "matching eval case and Day 4 output test",
+    "provenance": "docs/decisions.md Day 4 Windows output compatibility"
+  },
+  {
+    "id": "glm-intermittent-structured-output",
+    "observed": "A real --analyze-job call returned StructuredOutputError although the same sample later succeeded.",
+    "root_cause": "Provider output was nondeterministic and did not contain exactly one valid schema tool call.",
+    "fix": "Keep strict validation and safe failure; Day 8 added bounded business repair without relaxing the schema.",
+    "regression": "eval/datasets/error_cases.json#day3-live-intermittent-structured-output",
+    "provenance": "docs/decisions.md Day 3 live nondeterminism observation"
+  },
+  {
+    "id": "day9-live-grounding-mutation",
+    "observed": "The first Day 9 full run returned data qualityB for a JD keyword and Python grounding rejected the case; the complete rerun passed 10/10.",
+    "root_cause": "The provider produced a nondeterministic suffix that was absent from the source JD.",
+    "fix": "Keep exact grounding, count the first call as failed, continue the batch, and retain the case for repeatability analysis.",
+    "regression": "eval/datasets/error_cases.json#day9-live-jd-grounding-mutation",
+    "provenance": "Day 9 first full report on 2026-09-22"
+  }
+]

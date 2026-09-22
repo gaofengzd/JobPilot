@@ -19,5 +19,7 @@ data/private/
 eval/reports/*
 !eval/reports/.gitkeep
 !eval/reports/README.md
+!eval/reports/day9-v0.6.json
+!eval/reports/day9-v0.6.md
 .DS_Store
 Thumbs.db

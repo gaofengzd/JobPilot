@@ -433,5 +433,60 @@
       "gap": "Docker"
     },
     "expected": "localized error and partial report without unsupported task"
+  },
+  {
+    "id": "day9-live-jd-grounding-mutation",
+    "category": "live_extraction",
+    "input": {
+      "provider": "GLM-4.7",
+      "case": "data-engineer",
+      "run": "day9-first-full"
+    },
+    "expected": "safe JobGroundingError; include as failed first-schema result and continue remaining cases"
+  },
+  {
+    "id": "day10-upload-path-filename",
+    "category": "api_upload",
+    "input": {
+      "filename": "../../resume.md"
+    },
+    "expected": "sanitize to basename and never treat as server path"
+  },
+  {
+    "id": "day10-upload-over-limit",
+    "category": "api_upload",
+    "input": {
+      "size_bytes": 5242881
+    },
+    "expected": "HTTP 413 before model call"
+  },
+  {
+    "id": "day10-batch-over-configured-limit",
+    "category": "api_validation",
+    "input": {
+      "max_jobs": 1,
+      "raw_jobs": [
+        "Python",
+        "SQL"
+      ]
+    },
+    "expected": "HTTP 422 before model calls"
+  },
+  {
+    "id": "day10-provider-failure-mapping",
+    "category": "api_error_mapping",
+    "input": {
+      "exception": "ModelCallError"
+    },
+    "expected": "redacted HTTP 502"
+  },
+  {
+    "id": "day10-live-multiline-skill-section",
+    "category": "live_extraction",
+    "input": {
+      "provider": "GLM-4.7",
+      "layout": "skill heading followed by bullet lines"
+    },
+    "expected": "currently returns a safe JobGroundingError; retain for a later grounding-policy evaluation"
   }
 ]
