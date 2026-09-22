@@ -488,5 +488,22 @@
       "layout": "skill heading followed by bullet lines"
     },
     "expected": "currently returns a safe JobGroundingError; retain for a later grounding-policy evaluation"
+  },
+  {
+    "id": "day12-release-secret-tracking",
+    "category": "release_check",
+    "input": {
+      "file": ".env"
+    },
+    "expected": "release check rejects a tracked secret file"
+  },
+  {
+    "id": "day12-health-without-model",
+    "category": "release_check",
+    "input": {
+      "endpoint": "/health",
+      "services": "not initialized"
+    },
+    "expected": "health responds without loading LLM, BGE, or FAISS"
   }
 ]

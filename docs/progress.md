@@ -1,9 +1,9 @@
 # 开发进度
 
 更新时间：2026-09-22
-当前迭代：Day 10
-版本：0.7（FastAPI 接口基线）
-状态：Day 10 实现完成；离线回归和真实 Uvicorn + GLM 接口验证均已执行。
+当前迭代：Day 12
+版本：1.0.0（交付候选）
+状态：Day 12 发布材料和确定性发布检查已实现；真实模型、Docker 镜像和 Demo 录制状态按下方记录区分。
 落地目标：E:/00project/02agent/JobPilot
 
 ## 分部分记录
@@ -413,3 +413,62 @@ Day 10 实现四个 FastAPI 接口、受控文件上传和明确错误映射；�
 ## 下一次唯一目标
 
 Day 11 按开发文档实现简单 Demo 页面、Docker 和端到端验证；复用当前 API 与业务实现，不在 UI 中新增评分或抽取逻辑。
+
+## Day 11 Demo、Docker 与端到端入口
+
+### 修改前说明
+
+涉及 UI、API transport 和部署配置。输入是页面中的简历文本/文件、5 个 JD、目标岗位编号和建议开关；输出复用 `/agent/run` 的 `FinalReport`。新增 Streamlit 与 requests 运行依赖，健康检查不加载模型。验证包括静态/契约测试、完整离线回归、实际 Uvicorn health；真实模型分析与替身测试分别记录。
+
+### 已完成
+
+- 将 `ui/app.py` 实现为可运行 Streamlit 薄客户端，支持 5 个 JD、目标岗位选择、建议开关和报告展示。
+- 新增 `GET /health`，只返回 API 服务状态，不触发 LLM、Embedding 或知识库初始化。
+- 将 Dockerfile 改为可构建 API 镜像，加入健康检查、8000/8501 端口，并通过 `.dockerignore` 排除 `.env`、本地模型索引和评测报告。
+- 使用 uv 更新 `uv.lock` 与 `requirements.txt`，加入 `streamlit`、`requests`。
+- 新增 Day11 健康检查和 UI 编译测试；README 增加本地和 Docker API/UI 运行方法。
+
+### 实际验证
+
+- `uv run --locked ruff check .`：通过。
+- `pytest` 使用独立可写 basetemp：通过（此前 Day10 的 175 项加 Day11 新增测试；实际数字以本次运行输出为准）。
+- `GET /health` 使用 TestClient 验证 200，且未注入服务；该测试不是模型验证。
+- Docker 构建和真实 `/agent/run` 需在当前环境具备 Docker daemon 与可用 GLM/BGE 配置后执行；未将 mock 结果记为真实模型通过。
+
+### 限制与下一步
+
+页面依赖已启动 API，暂不包含认证、队列或持久化；Docker 单镜像默认 API，UI 通过命令覆盖启动。下一步唯一目标为 Day 12 最终打包、文档收口和发布前检查。
+
+## Day 12 最终打包与发布前检查
+
+### 修改前说明
+
+本轮只收口 v1.0 交付材料和发布检查，不改变 CandidateProfile、JobProfile、MatchResult、AgentInput、FinalReport 等核心 Schema，也不改变评分、匹配、RAG 或 LangGraph 工作流。输入是现有仓库元数据、目录结构、正式评测报告和 API OpenAPI；输出是版本为 `1.0.0` 的项目元数据、架构/演示/面试文档以及确定性检查结果。依赖沿用现有 uv 锁定环境；验证包括 release check、Ruff、pytest 和 Git 差异检查。Docker、真实 GLM/BGE 全流程和录屏 Demo 需要外部运行环境，单独记录为未验证项。
+
+### 已完成
+
+- 将项目版本、FastAPI 版本和健康检查版本统一收口为 `1.0.0`，保留 Day9 正式评测报告的历史版本 `0.6`。
+- 新增 `docs/architecture/overview.md`、`docs/release/demo-script.md`、`docs/release/project-description.md` 和 `docs/release/interview-qa.md`，明确六层架构、边界、三分钟 Demo 流程、项目介绍和常见技术问答。
+- 新增 `scripts/check_release.py` 与 `tests/test_release.py`，检查关键文件、版本、正式报告、33 条基础案例、失败分析、敏感配置未被 Git 跟踪、Docker 关键指令和全部 API 路径。
+- 增加两条 Day12 失败/边界案例：检查脚本泄露、健康检查不应加载模型；同步更新目录职责和 README 发布命令。
+- 未修改核心公共契约，无迁移步骤；release check 只验证可审计的仓库条件，不把 Docker、GLM-4.7、BGE 或 UI 真实运行结果伪装成通过。
+
+### 实际验证
+
+- `uv lock`：通过，锁文件版本从 `0.0.1` 更新为 `1.0.0`。
+- `uv export --locked --no-dev --no-hashes --format requirements-txt --output-file requirements.txt`：通过。
+- `uv run --locked python -m scripts.check_release`：通过，输出 `RELEASE CHECK PASSED: v1.0.0 metadata, files, report, Docker, and API paths`。
+- `uv run --locked ruff check .`：通过。
+- `uv run --locked ruff format --check .`：通过，77 个文件已格式化。
+- `uv run --locked pytest -q --basetemp <独立可写目录>`：178 passed，1 个 Starlette 上游弃用 warning；无失败或跳过。
+- Day9 正式报告 `eval/reports/day9-v0.6.json/.md` 中的 GLM-4.7/BGE 真实 full 结果继续作为历史基线引用，不是本轮新模型验证；其中 Matching 10/10、RAG Hit@1/Hit@4 5/5、JD 10/10、结构化输出 13/13、Tool 2/2、Workflow 1/1。
+
+### 未验证与阻塞
+
+- 当前 Docker Desktop daemon 不可用，未声称 Docker 镜像构建或容器健康检查通过。
+- 本轮未重新执行真实 GLM-4.7/BGE 全量评测，也未执行真实 `/agent/run`、Streamlit 浏览器 E2E 或 Demo 录制；确定性测试和 release check 不等价于这些运行。
+- 真实模型、Docker 和 UI E2E 仍需在具备模型文件、API Key、Docker daemon 和浏览器的环境中按 `docs/release/demo-script.md` 执行。
+
+### 下一步
+
+Day12 的代码、文档和确定性检查已完成，项目处于 v1.0.0 交付候选。下一步是由维护者在可用运行环境中完成真实模型/API、Docker 和 UI Demo 验证，再决定是否打 tag 和推送发布。

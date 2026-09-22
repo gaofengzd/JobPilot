@@ -1,7 +1,7 @@
 [project]
 name = "jobpilot"
-version = "0.0.1"
-description = "JobPilot v1.0 - Day 1 foundation"
+version = "1.0.0"
+description = "JobPilot v1.0 - structured job analysis Agent"
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
 dependencies = [
@@ -14,6 +14,8 @@ dependencies = [
     "pypdf>=5,<7",
     "python-multipart>=0.0.20,<1",
     "sentence-transformers>=3,<6",
+    "requests>=2.32,<3",
+    "streamlit>=1.40,<2",
     "uvicorn>=0.34,<1",
 ]
 

@@ -2,8 +2,8 @@
 
 智能求职岗位分析 Agent。项目事实来源：[开发文档](docs/开发文档.md)。
 
-当前迭代：**Day 10 FastAPI / v0.7**。已有四个复用现有业务与 LangGraph 的 API、受控上传、明确错误映射，以及 Day 9 的可复现评测基线；UI 尚未实现。
-GLM-4.7 已用三份合成简历和十条合成 JD 完成真实结构化调用验证；离线测试与真实服务结果分开记录。
+当前版本：**v1.0 / Day 12 交付候选**。项目包含 FastAPI API、Streamlit Demo、LangGraph 工作流、受控本地 RAG、33 条基础评测和 Docker 启动配置。
+GLM-4.7 与本地 `bge-large-zh-v1.5` 的真实结果、确定性测试和未运行项目分开记录；当前正式评测报告为 `eval/reports/day9-v0.6.{json,md}`。
 
 ## uv 环境与依赖
 
@@ -66,11 +66,13 @@ uv run --locked python main.py --check-llm
 - tests：契约、基础设施、解析、匹配、Gap、批量统计和 RAG 离线测试。
 - app/tools：5 个带 Pydantic 参数的薄 Tool；计算与检索仍由既有业务模块执行。
 - app/agents/reflection.py：按固定事实规则定位 Match、Gap、简历建议和学习来源问题。
-- app/api：FastAPI 应用、四个业务端点、进程内共享依赖、受控上传和异常映射。
+- app/api：FastAPI 应用、四个业务端点、健康检查、进程内共享依赖、受控上传和异常映射。
 - eval/datasets：持续积累抽取、匹配、批量、RAG、工作流和失败案例。
+- ui：Streamlit 薄客户端，只调用 `/agent/run` 并展示 `FinalReport`。
+- docs/architecture、docs/release：架构图、Demo 脚本、项目描述和面试问答。
+- scripts/check_release.py：发布前的确定性文件、版本、评测、Docker 和 API 检查。
 
-模型不负责计分或事实 Reflection。整个请求的统一墙钟时间预算尚未实现。
-Dockerfile、UI 和后续模块仅占位。
+模型不负责计分或事实 Reflection。整个请求的统一墙钟时间预算、认证、队列和持久化不属于 v1.0。
 
 ## 协作与记录
 
@@ -203,3 +205,38 @@ uv run --locked uvicorn app.api.main:app --host 127.0.0.1 --port 8000
 ```
 
 启动后访问 `http://127.0.0.1:8000/docs` 查看交互式接口文档。模型、Embedding、知识库和批量上限继续使用 `.env` 中的现有配置。上传内容在内存中解析，客户端文件名只作为安全的来源标识，不会被当作服务器路径。
+
+## Day 11 Demo 与 Docker
+
+Streamlit 页面是 API 的薄客户端：输入一份简历和 5 个 JD，选择目标岗位后调用 `/agent/run` 展示 `FinalReport`。页面不复制解析、匹配或建议规则。
+
+```powershell
+uv run --locked streamlit run ui/app.py
+```
+
+默认 API 地址为 `http://127.0.0.1:8000`，可通过 `JOBPILOT_API_URL` 修改。Docker 默认启动 API；UI 使用同一镜像覆盖启动命令：
+
+```powershell
+docker build -t jobpilot:day11 .
+docker run --env-file .env -p 8000:8000 jobpilot:day11
+docker run --env JOBPILOT_API_URL=http://host.docker.internal:8000 -p 8501:8501 jobpilot:day11 streamlit run ui/app.py --server.address=0.0.0.0 --server.port=8501
+Invoke-WebRequest http://127.0.0.1:8000/health
+```
+
+`.env`、本地模型和向量索引不会进入镜像构建上下文；容器运行时仍需通过环境变量或挂载提供模型配置。
+
+## Day 12 v1.0 发布检查
+
+运行以下命令执行不调用模型的本地发布检查：
+
+```powershell
+uv run --locked python -m scripts.check_release
+uv run --locked ruff check .
+uv run --locked ruff format --check .
+$testTemp = Join-Path (Get-Location) ('.pytest_cache/verify-' + [guid]::NewGuid().ToString('N'))
+uv run --locked pytest -q --basetemp $testTemp
+```
+
+架构图、三分钟 Demo 脚本、项目描述和面试问答位于 `docs/architecture/` 与 `docs/release/`。
+Demo 运行步骤不会把未实际执行的 Docker 或模型调用写成通过；发布前请按
+`docs/release/demo-script.md` 逐项执行并记录环境结果。

@@ -10,7 +10,7 @@
 | app/business | 确定性匹配和批量统计 | Day 4–5 |
 | app/tools | 五个薄 Tool 适配器 | 对应业务完成后接入 |
 | app/rag | Loader、分块、向量存储与检索 | Day 6 |
-| app/api/routes | 四个接口，agent/jobs/resume 三组路由 | Day 10 |
+| app/api/routes | 健康检查及四个业务接口，agent/jobs/resume 三组路由 | Day 10–11 |
 | app/utils | 仅存放必要的通用辅助代码 | 按实际需求 |
 | eval/datasets | 脱敏输入、人工期望、失败案例 | Day 1 建结构，Day 2 起积累 |
 | eval/evaluators | 抽取、匹配、RAG 评测 | Day 9 集中完善 |
@@ -19,7 +19,8 @@
 | data/knowledge | 人工整理的学习资料 | Day 6 |
 | data/sample_jobs | 脱敏岗位样例 | Day 3 |
 | data/sample_resumes | 脱敏简历样例 | Day 2 |
-| ui | Streamlit 页面 | Day 11 |
+| ui | Streamlit 薄客户端页面 | Day 11 |
 | docs/architecture | 架构与目录说明 | 当前已建 |
+| scripts | 发布前确定性检查 | Day 12 |
 
 空目录使用 .gitkeep 保留。所有 Python 占位只包含模块说明，没有虚假功能。

@@ -9,3 +9,5 @@ __pycache__
 data/uploads
 data/private
 data/vector_index
+eval/reports/*
+!eval/reports/README.md
