@@ -15,7 +15,7 @@ class JobAnalyzeRequest(Contract):
 
 
 class JobBatchRequest(Contract):
-    raw_jobs: list[NonEmptyText] = Field(min_length=1)
+    raw_jobs: list[NonEmptyText] = Field(min_length=1, max_length=1)
     candidate_profile: CandidateProfile
 
 

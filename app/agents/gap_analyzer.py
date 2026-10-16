@@ -8,7 +8,7 @@ from app.schemas.common import EvidenceRef
 from app.schemas.gap import SkillGap
 from app.schemas.job import JobProfile
 from app.schemas.match import MatchResult
-from app.utils.resume_files import normalize_text
+from app.utils.resume_files import mentions_term, normalize_text
 
 
 class GapAnalyzer:
@@ -54,5 +54,19 @@ class GapAnalyzer:
 
 
 def _evidence_for_skill(evidence: list[EvidenceRef], skill: str) -> list[EvidenceRef]:
+    """Return the quotes that support ``skill``.
+
+    ``mentions_term`` is the predicate the Reflection validator uses, so matching
+    with it keeps attachment and validation consistent -- a gap can no longer be
+    attached by a lenient test and then rejected by a stricter one, which is what
+    drove the repair loop into ``finalize_reflection_failure``.
+
+    The plain normalized substring test is kept as a fallback.  It only widens
+    which quote counts as support, so the "lacks JD evidence" contract keeps its
+    previous reach and can never fail on a quote it accepted before.
+    """
+    strict = [item for item in evidence if mentions_term(item.quote, skill)]
+    if strict:
+        return strict
     needle = normalize_text(skill)
     return [item for item in evidence if needle in normalize_text(item.quote)]

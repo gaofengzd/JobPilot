@@ -30,5 +30,13 @@
     "fix": "Keep exact grounding, count the first call as failed, continue the batch, and retain the case for repeatability analysis.",
     "regression": "eval/datasets/error_cases.json#day9-live-jd-grounding-mutation",
     "provenance": "Day 9 first full report on 2026-09-22"
+  },
+  {
+    "id": "resume-description-wrapped-lines",
+    "observed": "Resume descriptions split across adjacent PDF/text lines could be summarized or concatenated by the model and rejected by strict single-line grounding.",
+    "root_cause": "Grounding compared extracted values against the whole text but evidence locators only identified one source line; physical line wrapping was not an explicit contract.",
+    "fix": "Allow exact normalized spans across at most three physically consecutive lines in one page/section; continue rejecting paraphrases, skipped lines, and cross-page joins.",
+    "regression": "eval/datasets/grounding_cases.json and tests/test_resume_parser.py::test_adjacent_line_grounding_eval_cases",
+    "provenance": "User-observed GLM-4.7 resume grounding failure; deterministic fixture authored 2026-10-15"
   }
 ]

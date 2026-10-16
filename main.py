@@ -52,9 +52,9 @@ def main() -> int:
     )
     actions.add_argument(
         "--run-workflow",
-        nargs="+",
-        metavar="PATH",
-        help="Run the real workflow: first path is a resume, remaining paths are JDs",
+        nargs=2,
+        metavar=("RESUME_PATH", "JOB_PATH"),
+        help="Run the real workflow on one resume path and exactly one JD path",
     )
     actions.add_argument(
         "--demo-v05",
@@ -79,7 +79,8 @@ def main() -> int:
     actions.add_argument(
         "--demo-v02",
         action="store_true",
-        help="Run the offline Day 5 five-job match, gap, and batch demo",
+        help="Run the offline Day 5 synthetic multi-job match, gap, and batch demo "
+        "(batch statistics only; the live agent path is single-JD)",
     )
     actions.add_argument(
         "--demo-v01",
@@ -91,7 +92,8 @@ def main() -> int:
         "--selected-job-index",
         type=int,
         default=0,
-        help="Original JD index selected for workflow details",
+        choices=[0],
+        help="Original JD index selected for workflow details (always 0, single JD)",
     )
     parser.add_argument(
         "--no-advice",
@@ -139,18 +141,17 @@ def main() -> int:
             print(result.model_dump_json(indent=2))
             return 0
         if args.run_workflow:
-            if len(args.run_workflow) < 2:
+            if len(args.run_workflow) != 2:
                 raise JobGroundingError(
-                    "--run-workflow needs one resume path and at least one JD path."
+                    "--run-workflow needs exactly one resume path and one JD path."
                 )
-            resume_path, *job_paths = args.run_workflow
-            raw_jobs = [_read_job(path)[0] for path in job_paths]
+            resume_path, job_path = args.run_workflow
+            raw_jobs = [_read_job(job_path)[0]]
             state = create_initial_state(
                 resume_path=resume_path,
                 raw_jobs=raw_jobs,
                 selected_job_index=args.selected_job_index,
                 need_advice=not args.no_advice,
-                max_jobs=settings.max_jobs,
             )
             result = build_default_workflow(settings).invoke(state)
             print(result["final_report"].model_dump_json(indent=2))
@@ -158,10 +159,9 @@ def main() -> int:
         if args.demo_v05 or args.demo_v04:
             state = create_initial_state(
                 resume_text="Built a Python API with FastAPI",
-                raw_jobs=["backend", "agent"],
-                selected_job_index=1,
+                raw_jobs=["backend"],
+                selected_job_index=0,
                 need_advice=True,
-                max_jobs=settings.max_jobs,
             )
             result = build_workflow(build_demo_dependencies()).invoke(state)
             report = result["final_report"]
@@ -339,7 +339,6 @@ def main() -> int:
         state = create_initial_state(
             resume_text="Synthetic sample: Python",
             raw_jobs=["Synthetic Python JD"],
-            max_jobs=settings.max_jobs,
         )
         candidate = CandidateProfile(skills=["Python"])
         if args.check_llm:

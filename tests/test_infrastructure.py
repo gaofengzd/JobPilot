@@ -2,6 +2,7 @@
 
 import io
 import json
+from pathlib import Path
 
 import httpx
 import pytest
@@ -14,6 +15,8 @@ from app.core.exceptions import ConfigurationError, ModelCallError, StructuredOu
 from app.core.logging import configure_logging, log_event
 from app.schemas.common import Contract, NonEmptyText
 from app.services.llm import LLMClient
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 class Answer(Contract):
@@ -61,12 +64,29 @@ def test_missing_credentials_fail_before_model_creation():
 def test_invalid_config_values():
     for values in (
         {"max_jobs": 0},
+        {"max_jobs": 2},
         {"max_repair_attempts": 3},
         {"request_timeout_seconds": 0},
         {"llm_base_url": "not-a-url"},
     ):
         with pytest.raises(ValidationError):
             settings(**values)
+
+
+def test_shipped_env_example_loads_with_project_defaults(tmp_path, monkeypatch):
+    """The template and the local .env must both satisfy the single-JD contract.
+
+    A stale MAX_JOBS value here is invisible to the rest of the suite because every
+    other test constructs Settings explicitly; only a real load_settings() call fails.
+    """
+    for env_name in (".env", ".env.example"):
+        env_path = PROJECT_ROOT / env_name
+        if not env_path.is_file():
+            continue
+        for key in ("LLM_MODEL", "LLM_API_KEY", "MAX_JOBS", "MAX_REPAIR_ATTEMPTS"):
+            monkeypatch.delenv(key, raising=False)
+        config = Settings(_env_file=env_path)
+        assert config.max_jobs == 1, f"{env_name} must keep MAX_JOBS within the single-JD bound"
 
 
 def test_settings_load_env_file_and_hide_secret(tmp_path, monkeypatch):
@@ -105,6 +125,14 @@ def test_logging_allowlist_and_idempotence():
     assert len(lines) == 1
     assert json.loads(lines[0])["request_id"] == "one"
     assert "private-" not in lines[0]
+
+
+def test_logging_timestamp_uses_configured_timezone(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOG_TIMEZONE", "Asia/Shanghai")
+    logger = configure_logging(log_dir=tmp_path)
+    log_event(logger, "timezone.check")
+    payload = json.loads((tmp_path / "jobpilot.log").read_text(encoding="utf-8").splitlines()[-1])
+    assert payload["timestamp"].endswith("+08:00")
 
 
 def test_structured_success_and_usage_logged_without_prompt():

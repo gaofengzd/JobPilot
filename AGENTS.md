@@ -10,3 +10,4 @@
 明确区分离线验证、mock、真实模型和未完成事项。
 使用 uv 管理依赖和 .venv；提交 pyproject.toml 与 uv.lock。
 requirements.txt 只通过 uv export 生成，不手工修改。
+代码新增或变更时需要添加必要的日志，方便运行流程可追踪

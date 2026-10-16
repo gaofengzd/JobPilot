@@ -19,7 +19,7 @@
 | data/knowledge | 人工整理的学习资料 | Day 6 |
 | data/sample_jobs | 脱敏岗位样例 | Day 3 |
 | data/sample_resumes | 脱敏简历样例 | Day 2 |
-| ui | Streamlit 薄客户端页面 | Day 11 |
+| frontend | Vue 3 + TypeScript + Vite 浏览器客户端 | Day 11 |
 | docs/architecture | 架构与目录说明 | 当前已建 |
 | scripts | 发布前确定性检查 | Day 12 |
 

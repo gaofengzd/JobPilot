@@ -2,7 +2,7 @@
 
 ```mermaid
 flowchart TD
-    UI[Streamlit UI :8501] -->|HTTP JSON| API[FastAPI API :8000]
+    UI[Vue 3 + TypeScript UI :5173] -->|HTTP JSON| API[FastAPI API :8000]
     API --> INPUT[Pydantic input contracts]
     INPUT --> GRAPH[LangGraph workflow]
     GRAPH --> AGENTS[Parser / Gap / Advice / Reflection]

@@ -108,21 +108,21 @@ def test_workflow_parses_resume_once_and_keeps_selected_job_consistent():
     retriever = CountingRetriever([])
     result = invoke(
         dependencies(resume, jd, retriever=retriever),
-        ["Python", "Python,Docker"],
-        selected=1,
+        ["Python,Docker"],
+        selected=0,
     )
     report = result["final_report"]
 
     assert resume.calls == 1
-    assert jd.calls == [0, 1]
+    assert jd.calls == [0]
     assert report.status == "success"
-    assert report.selected_job_index == 1
+    assert report.selected_job_index == 0
     assert [gap.skill for gap in report.skill_gaps] == ["Docker"]
-    assert report.learning_plan.job_index == 1
+    assert report.learning_plan.job_index == 0
     assert report.learning_plan.tasks[0].source_chunk_ids == ["docker:0"]
     assert retriever.calls == ["Docker"]
-    assert report.batch_statistics.total_jobs == 2
-    assert [match.job_index for match in report.match_results] == [0, 1]
+    assert report.batch_statistics.total_jobs == 1
+    assert [match.job_index for match in report.match_results] == [0]
 
 
 def test_no_gap_skips_retrieval_and_learning_branch():
@@ -167,26 +167,25 @@ def test_need_advice_false_skips_rag_but_keeps_gap_and_resume_step():
     assert report.status == "success"
 
 
-def test_partial_job_failure_preserves_original_indexes_and_denominator():
+def test_single_job_failure_is_recorded_with_full_denominator():
     result = invoke(
         dependencies(
             CountingResumeParser(),
             StaticJDAnalyzer(failures={0}),
             retriever=CountingRetriever([]),
         ),
-        ["broken", "Python,Docker"],
-        selected=1,
+        ["broken"],
+        selected=0,
     )
     report = result["final_report"]
-    assert report.status == "partial"
+    assert report.status == "failed"
     assert report.job_errors == {0: "Synthetic JD failure."}
-    assert [job.job_index for job in report.job_profiles] == [1]
-    assert [match.job_index for match in report.match_results] == [1]
-    assert report.batch_statistics.total_jobs == 2
-    assert report.batch_statistics.valid_jobs == 1
+    assert report.job_profiles == []
+    assert report.match_results == []
+    assert report.batch_statistics.total_jobs == 1
+    assert report.batch_statistics.valid_jobs == 0
     assert report.batch_statistics.failed_jobs == 1
-    assert report.selected_job_index == 1
-    assert [gap.skill for gap in report.skill_gaps] == ["Docker"]
+    assert report.selected_job_index == 0
 
 
 def test_selected_job_failure_is_explicit_and_does_not_mix_other_job_details():
@@ -196,15 +195,16 @@ def test_selected_job_failure_is_explicit_and_does_not_mix_other_job_details():
             StaticJDAnalyzer(failures={0}),
             retriever=CountingRetriever([]),
         ),
-        ["broken", "Python,Docker"],
+        ["broken"],
         selected=0,
     )
     report = result["final_report"]
-    assert report.status == "partial"
+    assert report.status == "failed"
     assert report.selected_job_index == 0
     assert report.skill_gaps == []
     assert report.learning_plan is None
     assert report.resume_suggestions == []
+    assert report.job_errors == {0: "Synthetic JD failure."}
     assert report.errors == ["Selected job index 0 could not be analyzed."]
 
 

@@ -1,5 +1,8 @@
 """Day 2 resume loading and grounded extraction tests."""
 
+import io
+import json
+import logging
 from pathlib import Path
 
 import pytest
@@ -7,13 +10,15 @@ from pydantic import ValidationError
 from pypdf import PdfWriter
 from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
-from app.agents.resume_parser import ResumeParser
+from app.agents.resume_parser import ResumeParser, ground_candidate_profile
 from app.core.exceptions import ResumeGroundingError, ResumeReadError
+from app.core.logging import JsonFormatter
 from app.schemas.candidate import CandidateProfile, Education, Experience, Project
 from app.schemas.common import EvidenceRef
 from app.utils.resume_files import MAX_RESUME_BYTES, ResumeDocument, load_resume
 
 SAMPLES = Path(__file__).parents[1] / "data" / "sample_resumes"
+GROUNDING_CASES = Path(__file__).parents[1] / "eval" / "datasets" / "grounding_cases.json"
 
 
 class FakeLLM:
@@ -88,6 +93,75 @@ def test_pdf_page_locator(tmp_path):
     document = load_resume(path)
     assert document.locate_quote("Python") == "page:1 line:1"
     assert "Search API" in document.prompt_text
+
+
+@pytest.mark.parametrize(
+    ("source", "candidate"),
+    [
+        ("Python\u200b开发", "Python开发"),
+        ("Python\ufeff开发", "Python 开发"),
+        ("Built\tan API\nserving 10,000 users", "Built an API serving 10,000 users"),
+        ("Soft\u00adhyphen", "Softhyphen"),
+        ("Python（核心）/ FastAPI", "Python核心FastAPI"),
+    ],
+)
+def test_grounding_lookup_ignores_invisible_characters_and_whitespace(source, candidate):
+    document = ResumeDocument(
+        source_id="resume:invisible",
+        text=source,
+        lines=(("line:1", source),),
+    )
+    assert document.contains_exact_span(candidate)
+    assert document.locate_quote(candidate) == "line:1"
+    assert document.lines[0][1] == source
+
+
+def test_grounding_lookup_keeps_visible_text_significant():
+    document = ResumeDocument(
+        source_id="resume:visible",
+        text="Python开发",
+        lines=(("line:1", "Python开发"),),
+    )
+    assert not document.contains_exact_span("Python测试")
+
+
+@pytest.mark.parametrize(
+    "case",
+    json.loads(GROUNDING_CASES.read_text(encoding="utf-8")),
+    ids=lambda case: case["id"],
+)
+def test_adjacent_line_grounding_eval_cases(case):
+    lines = tuple((locator, text) for locator, text in case["lines"])
+    document = ResumeDocument(
+        source_id="resume:grounding-eval",
+        text="\n".join(text for _, text in lines),
+        lines=lines,
+    )
+
+    assert document.contains_exact_span(case["value"]) is case["grounded"]
+    quote_locator = document.locate_quote(case["quote"])
+    assert quote_locator == case["expected_locator"]
+
+
+def test_grounded_adjacent_line_profile_preserves_exact_joined_source_text():
+    document = ResumeDocument(
+        source_id="resume:wrapped.md",
+        text="Built an API\nserving 10,000 users",
+        lines=(
+            ("line:1", "Built an API"),
+            ("line:2", "serving 10,000 users"),
+        ),
+    )
+    exact_joined = "Built an API serving 10,000 users"
+    profile = CandidateProfile(
+        projects=[Project(name="Built an API", description=exact_joined)],
+        evidence=[evidence("Built an API serving 10,000 users")],
+    )
+
+    grounded = ground_candidate_profile(profile, document)
+
+    assert grounded.projects[0].description == exact_joined
+    assert grounded.evidence[0].locator == "line:1-line:2"
 
 
 @pytest.mark.parametrize(
@@ -180,6 +254,40 @@ def test_ungrounded_model_output_is_rejected(profile):
     )
     with pytest.raises(ResumeGroundingError):
         ResumeParser(FakeLLM(profile)).parse_document(document)
+
+
+def test_ungrounded_values_are_logged_without_enabling_general_content_capture(
+    monkeypatch,
+):
+    document = ResumeDocument(
+        source_id="resume:test",
+        text="Skills: Python",
+        lines=(("line:1", "Skills: Python"),),
+    )
+    profile = CandidateProfile(skills=["Invented Docker"], evidence=[evidence("Skills: Python")])
+    stream = io.StringIO()
+    logger = logging.Logger("jobpilot-test")
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(JsonFormatter())
+    logger.addHandler(handler)
+    monkeypatch.setattr("app.agents.resume_parser.logger", logger)
+
+    with pytest.raises(ResumeGroundingError) as error:
+        ground_candidate_profile(
+            profile,
+            document,
+            request_id="grounding-test",
+        )
+    assert "Invented Docker" not in str(error.value)
+
+    event = json.loads(stream.getvalue().splitlines()[-1])
+    assert event["event"] == "resume.grounding.failed"
+    assert event["request_id"] == "grounding-test"
+    assert event["grounding_issue"] == "unsupported_profile_value"
+    assert "skills[0]" in event["unsupported_fields"]
+    assert '"field": "skills[0]"' in event["unsupported_preview"]
+    assert "Invented Docker" in event["unsupported_preview"]
+    handler.close()
 
 
 def test_resume_instructions_remain_untrusted_data():

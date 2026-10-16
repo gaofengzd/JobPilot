@@ -6,7 +6,7 @@ Built JobPilot, a LangGraph-based job analysis Agent that parses resumes and
 job descriptions into grounded Pydantic profiles, computes deterministic skill
 coverage and gaps across batches, and produces citation-backed learning and
 resume suggestions through a bounded local BGE/FAISS retrieval branch. Exposed
-the workflow through FastAPI and a Streamlit demo, with 33-case evaluation,
+the workflow through FastAPI and a Vue 3 + TypeScript web client, with 33-case evaluation,
 strict evidence validation, controlled Tool Calling, Reflection, and Docker
 startup configuration.
 

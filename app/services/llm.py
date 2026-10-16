@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from time import perf_counter
 from typing import TypeVar
 
+import httpx
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, ValidationError
@@ -18,7 +19,7 @@ from app.core.exceptions import (
     StructuredOutputError,
     ToolArgumentError,
 )
-from app.core.logging import log_event
+from app.core.logging import content_fields, log_event
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
 ResultT = TypeVar("ResultT")
@@ -38,6 +39,9 @@ class LLMClient:
         settings.require_llm()
         self.settings = settings
         self.logger = logging.getLogger("jobpilot")
+        # The provider endpoint is configured explicitly. Do not let a stale
+        # shell-wide HTTP(S)_PROXY redirect model traffic to an unavailable proxy.
+        self.http_client = httpx.Client(trust_env=False)
         self.model = (
             model
             if model is not None
@@ -47,6 +51,8 @@ class LLMClient:
                 base_url=str(settings.llm_base_url) if settings.llm_base_url else None,
                 timeout=settings.request_timeout_seconds,
                 max_retries=settings.llm_max_retries,
+                http_client=self.http_client,
+                extra_body={"thinking": {"type": settings.llm_thinking_type}},
                 # Compatible providers may not implement streaming usage metadata.
                 stream_usage=False,
             )
@@ -62,7 +68,15 @@ class LLMClient:
     ) -> ModelT:
         started = perf_counter()
         event = {"request_id": request_id, "node": "llm", "attempt": 1}
-        log_event(self.logger, "llm.started", **event, status="running")
+        log_event(
+            self.logger,
+            "llm.started",
+            **event,
+            status="running",
+            model=self.settings.llm_model,
+            model_url=str(self.settings.llm_base_url or "provider-default"),
+            **content_fields(text, capture=self.settings.log_capture_content),
+        )
         messages = [
             SystemMessage(
                 content=(
@@ -140,6 +154,11 @@ class LLMClient:
                 for key in ("input_tokens", "output_tokens", "total_tokens")
                 if key in usage
             },
+            **content_fields(
+                result.model_dump_json(),
+                prefix="output",
+                capture=self.settings.log_capture_content,
+            ),
         )
         return result
 

@@ -9,6 +9,7 @@ def test_health_does_not_initialize_services() -> None:
     assert response.json() == {"status": "ok", "service": "jobpilot-api", "version": "1.0.0"}
 
 
-def test_ui_module_compiles() -> None:
-    source = open("ui/app.py", encoding="utf-8").read()
-    compile(source, "ui/app.py", "exec")
+def test_vue_frontend_entry_exists() -> None:
+    from pathlib import Path
+
+    assert Path("frontend/src/App.vue").is_file()

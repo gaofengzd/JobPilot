@@ -18,7 +18,8 @@ REQUIRED_PATHS = (
     "docs/release/demo-script.md",
     "docs/release/project-description.md",
     "docs/release/interview-qa.md",
-    "ui/app.py",
+    "frontend/src/App.vue",
+    "frontend/package.json",
     "Dockerfile",
     "uv.lock",
 )
@@ -49,6 +50,9 @@ def check_release(root: Path) -> list[str]:
         project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]
         if project.get("version") != "1.0.0":
             errors.append("pyproject version must be 1.0.0")
+        dependencies = {item.casefold() for item in project.get("dependencies", [])}
+        if any(item.startswith("streamlit") for item in dependencies):
+            errors.append("Streamlit must not be a maintained runtime dependency")
     except (OSError, KeyError, TypeError, tomllib.TOMLDecodeError) as exc:
         errors.append(f"invalid pyproject.toml: {exc}")
 
@@ -72,6 +76,10 @@ def check_release(root: Path) -> list[str]:
     for marker in ("FROM python:3.11", "HEALTHCHECK", "uvicorn", "requirements.txt"):
         if marker not in dockerfile:
             errors.append(f"Dockerfile missing marker: {marker}")
+    if "8501" in dockerfile:
+        errors.append("Dockerfile must not expose the retired Streamlit port")
+    if (root / "ui" / "app.py").exists():
+        errors.append("retired Streamlit entrypoint must be removed: ui/app.py")
 
     openapi_paths = {
         "/health",

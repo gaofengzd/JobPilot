@@ -13,13 +13,19 @@ build/
 !.env.example
 *.log
 logs/
+log/
 data/uploads/
 data/vector_index/
 data/private/
+frontend/node_modules/
+frontend/dist/
 eval/reports/*
 !eval/reports/.gitkeep
 !eval/reports/README.md
 !eval/reports/day9-v0.6.json
 !eval/reports/day9-v0.6.md
+# Stray lockfile produced by running npm at the repo root, which has no
+# package.json. Anchored so frontend/package-lock.json stays tracked.
+/package-lock.json
 .DS_Store
 Thumbs.db

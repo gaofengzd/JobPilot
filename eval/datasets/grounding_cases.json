@@ -1,0 +1,58 @@
+[
+  {
+    "id": "grounding-adjacent-two-lines",
+    "lines": [["line:4", "Built an API"], ["line:5", "serving 10,000 users"]],
+    "value": "Built an API serving 10,000 users",
+    "grounded": true,
+    "quote": "Built an API serving 10,000 users",
+    "expected_locator": "line:4-line:5"
+  },
+  {
+    "id": "grounding-adjacent-three-lines",
+    "lines": [["page:1 line:7", "Designed service"], ["page:1 line:8", "with FastAPI"], ["page:1 line:9", "and PostgreSQL"]],
+    "value": "Designed service with FastAPI and PostgreSQL",
+    "grounded": true,
+    "quote": "service with FastAPI",
+    "expected_locator": "page:1 line:7-page:1 line:8"
+  },
+  {
+    "id": "grounding-rejects-non-adjacent-lines",
+    "lines": [["line:1", "Built an API"], ["line:3", "serving 10,000 users"]],
+    "value": "Built an API serving 10,000 users",
+    "grounded": false,
+    "quote": "Built an API serving 10,000 users",
+    "expected_locator": null
+  },
+  {
+    "id": "grounding-rejects-paraphrase",
+    "lines": [["line:1", "Built an API"], ["line:2", "serving 10,000 users"]],
+    "value": "Developed a platform used by many people",
+    "grounded": false,
+    "quote": "Developed a platform",
+    "expected_locator": null
+  },
+  {
+    "id": "grounding-rejects-cross-page-join",
+    "lines": [["page:1 line:8", "Built an API"], ["page:2 line:1", "serving 10,000 users"]],
+    "value": "Built an API serving 10,000 users",
+    "grounded": false,
+    "quote": "Built an API serving 10,000 users",
+    "expected_locator": null
+  },
+  {
+    "id": "grounding-rejects-more-than-three-lines",
+    "lines": [["line:1", "Designed"], ["line:2", "a search"], ["line:3", "service"], ["line:4", "for researchers"]],
+    "value": "Designed a search service for researchers",
+    "grounded": false,
+    "quote": "Designed a search service for researchers",
+    "expected_locator": null
+  },
+  {
+    "id": "grounding-ignores-invisible-and-whitespace-differences",
+    "lines": [["line:1", "Python\u200b开发"], ["line:2", "Built an API"]],
+    "value": "Python 开发",
+    "grounded": true,
+    "quote": "Python\ufeff开发",
+    "expected_locator": "line:1"
+  }
+]

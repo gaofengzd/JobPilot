@@ -1,12 +1,20 @@
 """Day 3 grounded JD extraction tests."""
 
+import io
 import json
+import logging
 from pathlib import Path
 
 import pytest
 
-from app.agents.jd_analyzer import JDAnalyzer, build_job_document
+from app.agents.jd_analyzer import (
+    PREFERRED_MARKERS,
+    REQUIRED_MARKERS,
+    JDAnalyzer,
+    build_job_document,
+)
 from app.core.exceptions import JobGroundingError
+from app.core.logging import JsonFormatter
 from app.schemas.common import EvidenceRef
 from app.schemas.job import JobProfile
 from main import _read_job
@@ -32,18 +40,29 @@ def load_cases() -> list[dict]:
     return json.loads(CASES_PATH.read_text(encoding="utf-8"))
 
 
+def _matching_line(case: dict, *prefixes: str) -> str | None:
+    """Return the first source line starting with any prefix (English or Chinese)."""
+    for line in case["text"].splitlines():
+        if line.strip().startswith(prefixes):
+            return line
+    return None
+
+
 @pytest.mark.parametrize("case", load_cases(), ids=lambda case: case["id"])
-def test_ten_jd_cases_produce_grounded_job_profiles(case):
+def test_jd_cases_produce_grounded_job_profiles(case):
     expected = case["expected"]
-    profile = JobProfile(
-        job_index=999,
-        **expected,
-        evidence=[
-            evidence(f"Title: {expected['title']}"),
-            evidence(f"Company: {expected['company']}"),
-            evidence(next(line for line in case["text"].splitlines() if "skills:" in line.lower())),
-        ],
-    )
+    quotes = [
+        quote
+        for quote in (
+            _matching_line(case, "Title:", "标题:"),
+            _matching_line(case, "Company:", "公司:"),
+            _matching_line(case, "Required skills:", "任职要求", "岗位要求", "任职资格"),
+            _matching_line(case, "Preferred skills:", "加分项"),
+        )
+        if quote
+    ]
+    assert quotes, f"Case {case['id']} must expose at least one evidence line."
+    profile = JobProfile(job_index=999, **expected, evidence=[evidence(q) for q in quotes])
     fake = FakeLLM(profile)
     result = JDAnalyzer(fake).analyze(case["text"], job_index=7, source_id=f"job:{case['id']}")
     assert result.job_index == 7
@@ -152,6 +171,62 @@ def test_required_preferred_misclassification_is_rejected():
         JDAnalyzer(FakeLLM(profile)).analyze(text, job_index=0)
 
 
+def test_chinese_required_heading_applies_to_following_lines():
+    """Chinese postings put 任职要求 on its own line, then list clauses below."""
+    text = (
+        "jd1:软件测试\n"
+        "任职要求：\n"
+        "3）熟练运维性能测试工具(Jmeter、\n"
+        "LoadRunner)、接口测试工具（Pos tman)，保障环境稳定。\n"
+        "6）有军工单位或航天领域质量相关工作经验的优先。"
+    )
+    profile = JobProfile(
+        job_index=0,
+        title="软件测试",
+        required_skills=["Jmeter", "LoadRunner", "Pos tman"],
+        preferred_skills=["军工单位"],
+        evidence=[evidence("任职要求：")],
+    )
+    result = JDAnalyzer(FakeLLM(profile)).analyze(text, job_index=0)
+    assert result.required_skills == ["Jmeter", "LoadRunner", "Pos tman"]
+    assert result.preferred_skills == ["军工单位"]
+
+
+def test_chinese_heading_can_be_used_inline_and_with_punctuation_variants():
+    document = build_job_document(
+        "岗位要求：Java\n加分项：Kubernetes\n任职资格: Python",
+        source_id="job:zh",
+    )
+    assert document.has_marked_support("Java", REQUIRED_MARKERS)
+    assert document.has_marked_support("Python", REQUIRED_MARKERS)
+    assert document.has_marked_support("Kubernetes", PREFERRED_MARKERS)
+
+
+def test_heading_sections_do_not_leak_across_marker_types():
+    document = build_job_document("任职要求：\nJava\n加分项：\nKubernetes", source_id="job:zh")
+    assert document.has_marked_support("Java", REQUIRED_MARKERS)
+    assert not document.has_marked_support("Java", PREFERRED_MARKERS)
+    assert document.has_marked_support("Kubernetes", PREFERRED_MARKERS)
+    assert not document.has_marked_support("Kubernetes", REQUIRED_MARKERS)
+
+
+def test_inline_opposite_marker_overrides_open_section():
+    """A clause that states 优先 stays preferred even inside 任职要求."""
+    document = build_job_document(
+        "任职要求：\nJava\n有军工经验的优先。",
+        source_id="job:zh",
+    )
+    assert document.has_marked_support("Java", REQUIRED_MARKERS)
+    assert not document.has_marked_support("军工经验", REQUIRED_MARKERS)
+    assert document.has_marked_support("军工经验", PREFERRED_MARKERS)
+
+
+def test_unmarked_skill_is_still_rejected_under_chinese_heading():
+    document = build_job_document("任职要求：\nJava", source_id="job:zh")
+    assert not document.has_marked_support("Redis", REQUIRED_MARKERS)
+    assert not document.has_marked_support("Redis", PREFERRED_MARKERS)
+
+
 def test_job_file_reader_handles_utf8_bom(tmp_path):
     path = tmp_path / "job.txt"
     path.write_text("\ufeffTitle: Engineer", encoding="utf-8")
@@ -182,3 +257,163 @@ def test_optional_string_null_placeholder_is_normalized():
     assert result.company is None
     assert result.education_requirement is None
     assert result.experience_requirement is None
+
+
+def test_evidence_quote_spanning_two_adjacent_lines_is_grounded():
+    text = "Title: Engineer\nResponsibilities include platform work\nand on-call rotation"
+    profile = JobProfile(
+        job_index=0,
+        title="Engineer",
+        evidence=[evidence("Responsibilities include platform work and on-call rotation")],
+    )
+    result = JDAnalyzer(FakeLLM(profile)).analyze(text, job_index=0)
+    assert result.evidence[0].locator == "line:2-line:3"
+
+
+def test_evidence_quote_spanning_three_adjacent_lines_is_grounded():
+    text = "Title: Engineer\nLine one of duties\nLine two of duties\nLine three of duties"
+    profile = JobProfile(
+        job_index=0,
+        title="Engineer",
+        evidence=[evidence("Line one of duties Line two of duties Line three of duties")],
+    )
+    result = JDAnalyzer(FakeLLM(profile)).analyze(text, job_index=0)
+    assert result.evidence[0].locator == "line:2-line:4"
+
+
+def test_evidence_quote_beyond_three_lines_is_rejected():
+    text = "Title: Engineer\nA\nB\nC\nD"
+    profile = JobProfile(
+        job_index=0,
+        title="Engineer",
+        evidence=[evidence("A B C D")],
+    )
+    with pytest.raises(JobGroundingError, match="not found"):
+        JDAnalyzer(FakeLLM(profile)).analyze(text, job_index=0)
+
+
+def test_evidence_quote_skipping_a_line_is_rejected():
+    text = "Title: Engineer\nFirst line\nSeparator\nThird line"
+    profile = JobProfile(
+        job_index=0,
+        title="Engineer",
+        evidence=[evidence("First line Third line")],
+    )
+    with pytest.raises(JobGroundingError, match="not found"):
+        JDAnalyzer(FakeLLM(profile)).analyze(text, job_index=0)
+
+
+def test_lookup_tolerates_invisible_and_punctuation_differences():
+    document = build_job_document(
+        "Ti\u200btle: Sen\u00adior Engi­neer!\nRequired skills: Py\u200bthon",
+        source_id="job:invisible",
+    )
+    assert document.locate_quote("Title: Senior Engineer") == "line:1"
+    assert document.locate_quote("Required skills: Python") == "line:2"
+    assert document.contains_exact_span("Senior Engineer")
+
+
+def test_lookup_still_rejects_different_visible_text():
+    document = build_job_document("Title: Engineer", source_id="job:visible")
+    assert document.locate_quote("Title: Senior Engineer") is None
+    assert not document.contains_exact_span("Senior Engineer")
+
+
+def test_field_value_spanning_adjacent_lines_is_grounded():
+    text = "Title: Data Platform\nEngineer"
+    profile = JobProfile(
+        job_index=0,
+        title="Data Platform Engineer",
+        evidence=[evidence("Title: Data Platform")],
+    )
+    result = JDAnalyzer(FakeLLM(profile)).analyze(text, job_index=0)
+    assert result.title == "Data Platform Engineer"
+
+
+def test_ungrounded_values_are_logged_without_enabling_general_content_capture(monkeypatch):
+    profile = JobProfile(
+        job_index=0,
+        title="Invented title",
+        evidence=[evidence("Title: Engineer")],
+    )
+    stream = io.StringIO()
+    logger = logging.Logger("jobpilot-test")
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(JsonFormatter())
+    logger.addHandler(handler)
+    monkeypatch.setattr("app.agents.jd_analyzer.logger", logger)
+
+    with pytest.raises(JobGroundingError):
+        JDAnalyzer(FakeLLM(profile)).analyze(
+            "Title: Engineer",
+            job_index=3,
+            request_id="jd-grounding-test",
+        )
+
+    event = json.loads(stream.getvalue().splitlines()[-1])
+    assert event["event"] == "jobs.grounding.failed"
+    assert event["request_id"] == "jd-grounding-test"
+    assert event["job_index"] == 3
+    assert event["node"] == "analyze_jobs"
+    assert event["error_type"] == "JobGroundingError"
+    assert event["grounding_issue"] == "unsupported_profile_value"
+    assert "title" in event["unsupported_fields"]
+    assert '"field": "title"' in event["unsupported_preview"]
+    assert "Invented title" in event["unsupported_preview"]
+    handler.close()
+
+
+def test_unmarked_skill_classification_is_logged(monkeypatch):
+    # The skill must exist in the JD but without a required/preferred marker.
+    profile = JobProfile(
+        job_index=0,
+        title="Engineer",
+        required_skills=["Kubernetes"],
+        evidence=[evidence("Title: Engineer")],
+    )
+    stream = io.StringIO()
+    logger = logging.Logger("jobpilot-test")
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(JsonFormatter())
+    logger.addHandler(handler)
+    monkeypatch.setattr("app.agents.jd_analyzer.logger", logger)
+
+    with pytest.raises(JobGroundingError, match="classification"):
+        JDAnalyzer(FakeLLM(profile)).analyze("Title: Engineer\nKeywords: Kubernetes", job_index=0)
+
+    event = json.loads(stream.getvalue().splitlines()[-1])
+    assert event["event"] == "jobs.grounding.failed"
+    assert event["grounding_issue"] == "unmarked_skill_classification"
+    assert "required_skills[0]" in event["unsupported_fields"]
+    assert "Kubernetes" in event["unsupported_preview"]
+    handler.close()
+
+
+def test_missing_evidence_and_missing_quote_are_logged(monkeypatch):
+    stream = io.StringIO()
+    logger = logging.Logger("jobpilot-test")
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(JsonFormatter())
+    logger.addHandler(handler)
+    monkeypatch.setattr("app.agents.jd_analyzer.logger", logger)
+
+    with pytest.raises(JobGroundingError, match="no JD evidence"):
+        JDAnalyzer(FakeLLM(JobProfile(job_index=0, title="Engineer"))).analyze(
+            "Title: Engineer", job_index=0
+        )
+    assert json.loads(stream.getvalue().splitlines()[-1])["grounding_issue"] == "missing_evidence"
+
+    stream.seek(0)
+    stream.truncate(0)
+    profile = JobProfile(
+        job_index=0,
+        title="Engineer",
+        evidence=[evidence("Missing quote")],
+    )
+    with pytest.raises(JobGroundingError, match="not found"):
+        JDAnalyzer(FakeLLM(profile)).analyze("Title: Engineer", job_index=0)
+    event = json.loads(stream.getvalue().splitlines()[-1])
+    assert event["grounding_issue"] == "unsupported_evidence_quote"
+    assert "evidence.quote" in event["unsupported_fields"]
+    assert "Missing quote" in event["unsupported_preview"]
+    handler.close()

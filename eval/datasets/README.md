@@ -6,4 +6,6 @@ Day 9 基础口径固定为 33 条：3 个简历、10 个 JD、10 个匹配、5 
 
 `citation_cases.json` 保存人工 Citation Support 判断；`failure_analyses.json` 保存已观察失败的原因、修复、回归入口和来源。`error_cases.json` 持续追加新失败案例。
 
+`grounding_cases.json` 是简历原文定位规则的确定性边界集，由 `tests/test_resume_parser.py` 逐例执行；它测试的是 Python grounding 规则，不调用模型，也不作为 GLM 抽取准确率结果。
+
 运行器支持 deterministic、local、full 三种模式，结果写入 `eval/reports`。只有 full 会调用 GLM；只有 local/full 会真实加载本地 BGE。报告必须保留模式和限制，不能把不同运行类型合并成同一种验证。

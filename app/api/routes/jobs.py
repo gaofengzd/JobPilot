@@ -1,4 +1,4 @@
-"""Single and batch job analysis endpoints."""
+"""Single-JD and single-item job analysis endpoints."""
 
 from uuid import uuid4
 
@@ -33,7 +33,8 @@ def analyze_batch(
     if len(payload.raw_jobs) > services.settings.max_jobs:
         raise HTTPException(
             status_code=422,
-            detail=f"Batch exceeds max_jobs={services.settings.max_jobs}",
+            detail=f"Request carries {len(payload.raw_jobs)} JD(s) but max_jobs="
+            f"{services.settings.max_jobs}; submit one JD per request.",
         )
     request_id = str(uuid4())
     jobs = []

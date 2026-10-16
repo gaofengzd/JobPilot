@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     llm_api_key: SecretStr = SecretStr("")
     llm_base_url: HttpUrl | None = None
     llm_structured_method: Literal["json_schema", "function_calling"] = "function_calling"
+    llm_thinking_type: Literal["enabled", "disabled"] = "disabled"
     llm_max_retries: int = Field(default=0, ge=0, le=2)
     embedding_model: str = ""
     embedding_api_key: SecretStr = SecretStr("")
@@ -31,7 +32,8 @@ class Settings(BaseSettings):
     knowledge_dir: Path = PROJECT_ROOT / "data" / "knowledge"
     vector_index_dir: Path = PROJECT_ROOT / "data" / "vector_index"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
-    max_jobs: int = Field(default=20, ge=1, le=20)
+    log_capture_content: bool = False
+    max_jobs: int = Field(default=1, ge=1, le=1)
     max_repair_attempts: int = Field(default=2, ge=0, le=2)
     request_timeout_seconds: float = Field(default=60, gt=0, allow_inf_nan=False)
 

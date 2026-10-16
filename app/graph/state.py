@@ -44,10 +44,7 @@ def create_initial_state(
     resume_path: str | None = None,
     selected_job_index: int = 0,
     need_advice: bool = True,
-    max_jobs: int = 20,
 ) -> JobPilotState:
-    if not 1 <= max_jobs <= 20:
-        raise ValueError("max_jobs must be between 1 and 20")
     validated = InternalInput(
         resume_path=resume_path,
         resume_text=resume_text,
@@ -55,8 +52,6 @@ def create_initial_state(
         selected_job_index=selected_job_index,
         need_advice=need_advice,
     )
-    if len(validated.raw_jobs) > max_jobs:
-        raise ValueError(f"Batch exceeds max_jobs={max_jobs}")
     return JobPilotState(
         resume_path=validated.resume_path,
         resume_text=validated.resume_text,

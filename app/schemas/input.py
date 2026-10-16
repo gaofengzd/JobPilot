@@ -9,7 +9,7 @@ from app.schemas.common import Contract, NonEmptyText, NonNegativeInt
 
 class AgentInput(Contract):
     resume_text: NonEmptyText
-    raw_jobs: list[NonEmptyText] = Field(min_length=1)
+    raw_jobs: list[NonEmptyText] = Field(min_length=1, max_length=1)
     selected_job_index: NonNegativeInt = 0
     need_advice: bool = True
 
@@ -23,7 +23,7 @@ class AgentInput(Contract):
 class InternalInput(Contract):
     resume_path: NonEmptyText | None = None
     resume_text: NonEmptyText | None = None
-    raw_jobs: list[NonEmptyText] = Field(min_length=1)
+    raw_jobs: list[NonEmptyText] = Field(min_length=1, max_length=1)
     selected_job_index: NonNegativeInt = 0
     need_advice: bool = True
 

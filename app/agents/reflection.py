@@ -1,11 +1,9 @@
 """Deterministic fact reflection over existing structured workflow output."""
 
-import re
-
 from app.business.matching_engine import normalize_skill
 from app.graph.state import JobPilotState
 from app.schemas.common import EvidenceRef
-from app.utils.resume_files import normalize_text
+from app.utils.resume_files import mentions_term
 
 
 class Reflection:
@@ -65,7 +63,7 @@ class Reflection:
                 issues.append(
                     f"resume_suggestions:{index}:candidate evidence is not in the resume profile"
                 )
-            if any(_mentions(suggestion.suggested_text, skill) for skill in gap_skills):
+            if any(mentions_term(suggestion.suggested_text, skill) for skill in gap_skills):
                 issues.append(
                     f"resume_suggestions:{index}:suggestion presents a missing skill as experience"
                 )
@@ -96,10 +94,4 @@ def repair_target(issues: list[str]) -> str | None:
 
 
 def _evidence_mentions(evidence: list[EvidenceRef], skill: str) -> bool:
-    return any(_mentions(item.quote, normalize_skill(skill)) for item in evidence)
-
-
-def _mentions(text: str, normalized_skill: str) -> bool:
-    haystack = normalize_text(text)
-    needle = normalize_text(normalized_skill)
-    return re.search(rf"(?<!\w){re.escape(needle)}(?!\w)", haystack) is not None
+    return any(mentions_term(item.quote, skill) for item in evidence)

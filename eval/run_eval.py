@@ -27,7 +27,14 @@ from eval.evaluators.rag_eval import evaluate_citation_support, evaluate_hit_at_
 
 ROOT = Path(__file__).resolve().parents[1]
 DATASETS = ROOT / "eval" / "datasets"
-DEFAULT_REPORT = ROOT / "eval" / "reports" / "day9-v0.6"
+REPORTS = ROOT / "eval" / "reports"
+# `day9-v0.6` is a frozen release artifact: `scripts/check_release.py` asserts
+# its report_version, base_case_count and failure_analyses, so an unqualified
+# run must never rewrite it.  The default therefore targets an untracked
+# scratch path; refresh the formal report only with an explicit
+# `--output-prefix eval/reports/day9-v0.6`.
+FROZEN_REPORT = REPORTS / "day9-v0.6"
+DEFAULT_REPORT = REPORTS / "latest"
 
 
 class EvaluationLogHandler(logging.Handler):
@@ -39,7 +46,7 @@ class EvaluationLogHandler(logging.Handler):
         self.records.append(record)
 
 
-def main() -> int:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run JobPilot v0.6 evaluation")
     parser.add_argument(
         "--mode",
@@ -51,9 +58,16 @@ def main() -> int:
         "--output-prefix",
         type=Path,
         default=DEFAULT_REPORT,
-        help="Write <prefix>.json and <prefix>.md",
+        help=(
+            "Write <prefix>.json and <prefix>.md. Defaults to the untracked scratch path "
+            "eval/reports/latest; pass eval/reports/day9-v0.6 only to refresh the frozen report."
+        ),
     )
-    args = parser.parse_args()
+    return parser
+
+
+def main() -> int:
+    args = build_parser().parse_args()
     report = run_evaluation(args.mode)
     write_report(report, args.output_prefix)
     print(json.dumps(_console_summary(report, args.output_prefix), ensure_ascii=False, indent=2))
@@ -149,7 +163,7 @@ def run_evaluation(mode: str) -> dict:
         "dataset": {
             "inventory": inventory,
             "base_case_count": base_count,
-            "base_definition": "3 resume + 10 JD + 10 matching + 5 RAG + 5 error",
+            "base_definition": (f"3 resume + {len(jd_cases)} JD + 10 matching + 5 RAG + 5 error"),
             "expectations": "human-authored synthetic or de-identified labels",
         },
         "metrics": metrics,

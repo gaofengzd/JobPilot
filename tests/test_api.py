@@ -48,13 +48,13 @@ def settings(**overrides):
         _env_file=None,
         llm_model="test-model",
         llm_api_key=SecretStr("synthetic-key"),
-        max_jobs=20,
+        max_jobs=1,
     )
     values.update(overrides)
     return Settings(**values)
 
 
-def services(*, resume_parser=None, jd_analyzer=None, max_jobs=20):
+def services(*, resume_parser=None, jd_analyzer=None, max_jobs=1):
     resume_parser = resume_parser or CapturingResumeParser()
     jd_analyzer = jd_analyzer or StaticJDAnalyzer()
     matching = MatchingEngine()
@@ -122,34 +122,42 @@ def test_single_job_analysis_and_request_validation():
     assert invalid.status_code == 422
 
 
-def test_batch_keeps_partial_failures_and_valid_denominator():
-    injected = services(jd_analyzer=StaticJDAnalyzer(failures={1}))
-    response = TestClient(create_app(injected)).post(
+def test_batch_accepts_one_job_and_rejects_more():
+    injected = services()
+    accepted = TestClient(create_app(injected)).post(
         "/jobs/batch",
-        json={
-            "candidate_profile": {"skills": ["Python"]},
-            "raw_jobs": ["Python,Docker", "broken", "Python"],
-        },
+        json={"candidate_profile": {"skills": ["Python"]}, "raw_jobs": ["Python,Docker"]},
     )
-    body = response.json()
-    assert response.status_code == 200
-    assert [item["job_index"] for item in body["job_profiles"]] == [0, 2]
-    assert [item["job_index"] for item in body["match_results"]] == [0, 2]
-    assert body["job_errors"] == {"1": "Synthetic JD failure."}
-    assert body["batch_statistics"]["total_jobs"] == 3
-    assert body["batch_statistics"]["valid_jobs"] == 2
-    assert body["batch_statistics"]["failed_jobs"] == 1
+    body = accepted.json()
+    assert accepted.status_code == 200
+    assert [item["job_index"] for item in body["job_profiles"]] == [0]
+    assert [item["job_index"] for item in body["match_results"]] == [0]
+    assert body["job_errors"] == {}
+    assert body["batch_statistics"]["total_jobs"] == 1
+    assert body["batch_statistics"]["valid_jobs"] == 1
+    assert body["batch_statistics"]["failed_jobs"] == 0
 
-
-def test_dynamic_batch_limit_returns_422_before_model_calls():
-    analyzer = StaticJDAnalyzer()
-    injected = services(jd_analyzer=analyzer, max_jobs=1)
-    response = TestClient(create_app(injected)).post(
+    rejected = TestClient(create_app(services())).post(
         "/jobs/batch",
         json={"candidate_profile": {"skills": []}, "raw_jobs": ["Python", "SQL"]},
     )
-    assert response.status_code == 422
-    assert analyzer.calls == []
+    assert rejected.status_code == 422
+
+
+def test_batch_records_single_job_failure_without_model_bypass():
+    analyzer = StaticJDAnalyzer(failures={0})
+    injected = services(jd_analyzer=analyzer)
+    response = TestClient(create_app(injected)).post(
+        "/jobs/batch",
+        json={"candidate_profile": {"skills": []}, "raw_jobs": ["broken"]},
+    )
+    body = response.json()
+    assert response.status_code == 200
+    assert body["job_profiles"] == []
+    assert body["job_errors"] == {"0": "Synthetic JD failure."}
+    assert body["batch_statistics"]["total_jobs"] == 1
+    assert body["batch_statistics"]["valid_jobs"] == 0
+    assert body["batch_statistics"]["failed_jobs"] == 1
 
 
 def test_agent_requests_have_isolated_state_and_same_business_results():
@@ -168,18 +176,20 @@ def test_agent_requests_have_isolated_state_and_same_business_results():
     assert first.json()["status"] == second.json()["status"] == "success"
 
 
-def test_agent_rejects_invalid_selection_and_over_limit():
+def test_agent_rejects_invalid_selection_and_multiple_jobs():
     client = TestClient(create_app(services(max_jobs=1)))
     invalid_selection = client.post(
         "/agent/run",
         json={"resume_text": "Python", "raw_jobs": ["Python"], "selected_job_index": 1},
     )
-    over_limit = client.post(
+    multiple_jobs = client.post(
         "/agent/run",
         json={"resume_text": "Python", "raw_jobs": ["Python", "SQL"]},
     )
+    empty_jobs = client.post("/agent/run", json={"resume_text": "Python", "raw_jobs": []})
     assert invalid_selection.status_code == 422
-    assert over_limit.status_code == 422
+    assert multiple_jobs.status_code == 422
+    assert empty_jobs.status_code == 422
 
 
 class FailingJDAnalyzer:

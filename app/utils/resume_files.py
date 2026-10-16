@@ -1,5 +1,7 @@
 """Read supported resumes without OCR or arbitrary format guessing."""
 
+import re
+import unicodedata
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
@@ -10,6 +12,7 @@ from app.core.exceptions import ResumeReadError
 
 SUPPORTED_SUFFIXES = {".pdf", ".md", ".txt"}
 MAX_RESUME_BYTES = 5 * 1024 * 1024
+MAX_GROUNDING_LINES = 3
 
 
 @dataclass(frozen=True)
@@ -24,10 +27,35 @@ class ResumeDocument:
 
     def locate_quote(self, quote: str) -> str | None:
         needle = normalize_text(quote)
+        if not needle:
+            return None
         for locator, line in self.lines:
-            if needle and needle in normalize_text(line):
+            if needle in normalize_text(line):
                 return locator
+        for start in range(len(self.lines)):
+            for end in range(start + 1, min(start + MAX_GROUNDING_LINES, len(self.lines))):
+                if not _locators_are_consecutive(self.lines[end - 1][0], self.lines[end][0]):
+                    break
+                span = " ".join(line for _, line in self.lines[start : end + 1])
+                if needle in normalize_text(span):
+                    return f"{self.lines[start][0]}-{self.lines[end][0]}"
         return None
+
+    def contains_exact_span(self, value: str) -> bool:
+        """Accept exact text on one line or across up to three adjacent source lines."""
+        needle = normalize_text(value)
+        if not needle:
+            return False
+        for start in range(len(self.lines)):
+            for end in range(start, min(start + MAX_GROUNDING_LINES, len(self.lines))):
+                if end > start and not _locators_are_consecutive(
+                    self.lines[end - 1][0], self.lines[end][0]
+                ):
+                    break
+                span = " ".join(line for _, line in self.lines[start : end + 1])
+                if needle in normalize_text(span):
+                    return True
+        return False
 
 
 def load_resume(path: str | Path) -> ResumeDocument:
@@ -132,4 +160,70 @@ def _build_document(
 
 
 def normalize_text(value: str) -> str:
-    return " ".join(value.casefold().split())
+    """Normalize text for lookup only; never use this to rewrite stored content.
+
+    Resume extraction and LLM output can disagree on line breaks, spacing, or
+    invisible Unicode formatting characters.  Keeping only visible letters,
+    numbers, and combining marks makes punctuation and layout irrelevant while
+    preserving the actual textual content as evidence.
+    """
+    normalized = unicodedata.normalize("NFKC", value).casefold()
+    return "".join(
+        char for char in normalized if char.isalnum() or unicodedata.category(char).startswith("M")
+    )
+
+
+def mentions_term(text: str, term: str) -> bool:
+    """Return whether ``term`` occurs in ``text`` as a term, not a Latin fragment.
+
+    Both sides are compared after :func:`normalize_text`, so casing, spacing, and
+    invisible formatting characters never decide the result.
+
+    A boundary is only required beside an ASCII alphanumeric edge.  Chinese is
+    written without word separators, so ``熟悉软件测试标准…`` has to count as
+    containing its own skill phrase; ``re.findall(r"\\w+")`` glues a whole Chinese
+    sentence into one token and a plain word-boundary rule therefore rejects every
+    embedded Chinese phrase.  The ASCII-only guard still keeps ``Java`` from
+    matching inside ``JavaScript``.
+    """
+    needle = normalize_text(term)
+    if not needle:
+        return False
+    raw = unicodedata.normalize("NFKC", text).casefold()
+    if not raw:
+        return False
+    # The token form keeps Latin separators so `Jmeter/LoadRunner` stays two terms;
+    # the stripped form tolerates the model disagreeing about spacing.
+    candidates = (" ".join(re.findall(r"\w+", raw)), normalize_text(raw))
+    return any(_bounded_contains(haystack, needle) for haystack in candidates)
+
+
+def _bounded_contains(haystack: str, needle: str) -> bool:
+    guard_left = _is_ascii_word(needle[0])
+    guard_right = _is_ascii_word(needle[-1])
+    start = 0
+    while True:
+        index = haystack.find(needle, start)
+        if index < 0:
+            return False
+        end = index + len(needle)
+        left_ok = not guard_left or index == 0 or not _is_ascii_word(haystack[index - 1])
+        right_ok = not guard_right or end == len(haystack) or not _is_ascii_word(haystack[end])
+        if left_ok and right_ok:
+            return True
+        start = index + 1
+
+
+def _is_ascii_word(char: str) -> bool:
+    return char.isascii() and char.isalnum()
+
+
+def _locators_are_consecutive(left: str, right: str) -> bool:
+    left_parts = left.rsplit(":", 1)
+    right_parts = right.rsplit(":", 1)
+    if len(left_parts) != 2 or len(right_parts) != 2:
+        return False
+    try:
+        return left_parts[0] == right_parts[0] and int(right_parts[1]) == int(left_parts[1]) + 1
+    except ValueError:
+        return False

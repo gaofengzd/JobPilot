@@ -1,5 +1,79 @@
 # 决策记录
 
+## 2026-10-14 / 退役 Streamlit，统一 Vue 前端
+
+- 删除 `ui/app.py`，移除 `streamlit` 与旧页面专用的 `requests` 依赖；`frontend/` 的 Vue 3 + TypeScript + Vite 页面成为唯一维护的网页客户端。
+- Docker 镜像只提供 FastAPI API，移除 8501 暴露和 Streamlit 覆盖启动方式；浏览器前端独立通过 Vite 开发服务器运行。
+- 原因：项目当前只需要一个可验证的浏览器入口，维护两套 UI 会重复输入校验、错误展示、文档和测试；Vue 页面已满足当前功能。
+- 影响：Streamlit 启动命令、8501 端口和 `ui/app.py` 不再有效；API、`/agent/run` 契约、核心 Schema、业务计算、RAG 与模型调用无迁移变化。历史记录中的 Streamlit 仅说明过去的实现状态。
+
+## 2026-10-14 / 单岗位分析的前端输入
+
+- Vue 的五个岗位输入框作为 1–5 个 JD 的上限保留，但将必填条件从五个改为至少一个；空值不会发送给 API。
+- 目标岗位下拉选项仅包含非空 JD，选项索引与紧凑后的 `raw_jobs` 顺序一致。
+- 原因：`AgentInput` 和工作流本来支持一个或多个岗位，前端强制五个输入与后端契约不一致，阻碍单岗位验证。
+- 影响：无新增依赖、无 API 或 Schema 迁移；批量分析仍可在填写多个 JD 时使用。
+
+## 2026-10-14 / 简历 grounding 失败值的受控诊断日志
+
+- 简历抽取字段或 evidence quote 未通过原文 grounding 时，白名单 JSON 事件记录失败字段、问题类型及最多 2000 字符的未通过值，包含 request_id 以关联工作流；普通模型内容采集开关不控制这一项诊断值。
+- API 对外错误改为通用 `ResumeGroundingError` 消息，详细失败值只进入本地 `log/jobpilot.log`，不回显浏览器。
+- 原因：真实运行只看到 grounding 类型，无法辨认是哪个字段被改写或拼接；定位该类失败需要检查对应抽取值。
+- 影响：本地日志可能包含简历个人信息，README 要求限制日志访问并在排障后删除；核心 Schema、严格 grounding、重试次数及 502 契约不变。
+
+## 2026-10-14 / 测试文件的多岗位边界
+
+- `docs/岗位jd.txt` 是包含 jd1--jd5 的多岗位汇总文件，而 CLI/API 的 `raw_jobs` 约定是一项岗位一段文本。
+- 测试保留该边界：整文件作为一个 JD 的调用出现 60 秒模型超时，系统返回失败报告；不通过放宽解析规则掩盖输入格式问题。
+- 页面验证应将五个岗位段落拆分后分别提交；后续若需要文件导入多岗位，应新增明确的分段解析契约和测试，不在本次范围内。
+
+## 2026-10-14 / GLM 结构化抽取关闭思考模式
+
+- 中文长简历真实运行中，GLM-4.7 在 `function_calling` 抽取阶段耗时接近 60 秒并偶发 grounding/结构化失败。
+- 对结构化抽取请求增加智谱兼容的 `thinking.type=disabled`，默认可由 `LLM_THINKING_TYPE` 配置；不改变输出 Schema 或 Python 计算职责。
+- 影响是抽取请求更快、更稳定；需要复杂推理的 Future Work 不在本次范围内。
+
+## 2026-10-14 / 文件日志与内容采集开关
+
+- 日志写入终端和 `log/jobpilot.log`，以便后端窗口关闭后仍可追踪请求。
+- 模型日志记录显式访问地址、模型名、请求/响应长度、SHA-256 和 token，不默认记录简历、JD、Prompt 或模型原文。
+- 增加 `LOG_CAPTURE_CONTENT` 开关，默认 `false`；仅本地排障临时开启并限制预览长度，避免将个人信息和密钥写入日志。
+
+## 2026-10-14 / 全流程 JSON 日志
+
+- 为定位 `/agent/run` 的模型、RAG、Tool 或 Reflection 失败，增加请求、服务初始化、工作流节点和最终报告的生命周期日志。
+- 统一复用现有白名单 JSON logger，日志只允许 request_id、node、status、耗时、岗位索引、token 统计和错误类型等元数据；禁止写入用户输入、Prompt、模型回复和原始异常。
+- 节点包装只观察调用，不改变节点返回值和 Graph 分支；失败仍沿用现有 API 错误映射。
+
+## 2026-10-14 / LLM 请求忽略环境代理
+
+- 实际问题表现为独立 smoke test 与 Uvicorn 完整请求的模型请求结果不一致；代码未配置代理，但底层 HTTP 客户端默认会读取进程环境代理。
+- 因项目通过 `LLM_BASE_URL` 明确指定智谱 API，`LLMClient` 使用 `httpx.Client(trust_env=False)` 直连该地址，避免不可用的 shell 代理影响模型调用。
+- 影响是 JobPilot 不再使用环境代理访问 LLM；若部署环境必须经代理访问外网，需要后续增加显式、可审计的代理配置，不在本次迭代扩大范围。
+
+## 2026-10-14 / 增加 Vue 前端并保留 Streamlit
+
+- 为便于浏览器验证，新增独立 Vue 3 + TypeScript + Vite 客户端；现有 Streamlit 保留作为兼容 Demo，不扩大 v1.0 后端范围。
+- Vue 只负责表单、HTTP 请求、错误呈现和报告展示，继续复用 `/agent/run` 与现有 FinalReport 契约；不把匹配、评分或业务计算放到浏览器。
+- 前端 API 地址通过 `VITE_API_BASE_URL` 配置，默认 `http://127.0.0.1:8000`；开发服务器默认端口 5173。
+
+## 2026-10-14 / 本地前后端跨域
+
+- Vue 开发服务器与 FastAPI 使用不同端口，浏览器请求需要 CORS；FastAPI 仅允许本地 `localhost/127.0.0.1` 的 5173 和 8501 来源。
+- 不允许任意来源、不允许凭据，不改变业务接口或数据契约；生产部署若更换域名需显式补充白名单。
+
+## 2026-10-13 / 保留 API 受控错误并改善 UI 展示
+
+- API 已将模型、结构化输出和 grounding 错误安全映射为 502；前端此前丢弃了响应 JSON，导致用户无法区分失败原因。
+- 仅在 Streamlit 客户端读取并展示已有的 `detail.code` / `detail.message`，不暴露 provider 原始异常，不改变公共 API 契约。
+- 影响范围限于 UI 诊断；真实模型调用仍需用页面显示的具体错误继续验证。
+
+## 2026-10-13 / README 增加 CMD 启动说明
+
+- 用户使用 Windows CMD 手动启动项目，补充后端和 Streamlit 前端的双窗口命令。
+- 前端命令在当前 CMD 会话设置 `STREAMLIT_CONFIG_DIR` 到项目内的 `.streamlit`，避免默认用户目录权限问题；不新增依赖，不改变 API 或公共 Schema。
+- 验证方式为 README 文档检查和 Git 差异检查。
+
 ## 2026-09-18 / Day 1 骨架
 
 - 用户本次指定完整 Day 1，并要求 uv 初始化、虚拟环境及持续记录。
@@ -306,3 +380,91 @@
 - 原因：Day 12 是 v1.0 交付候选，需要一个可重复的本地收口入口，同时不能把评测报告版本误改成产品版本。
 - 影响：只改发布元数据和文档/维护脚本，核心 Schema、评分、Graph、RAG 检索契约无变化；已有 API 客户端不需要迁移，健康检查响应中的版本从 `0.7.0` 变为 `1.0.0`。
 - 限制：发布检查不能证明 Docker daemon、GLM/BGE 服务或录屏已经运行；这些仍需按 progress.md 逐项记录实际环境结果。
+
+## ADR-034：日志时间戳使用可配置本地时区
+
+- 日期：2026-10-15
+- 状态：已采用
+- 决策：日志 JSON 时间戳默认使用 `Asia/Shanghai`，通过 `LOG_TIMEZONE` 可覆盖；始终保留 ISO 8601 时区偏移。
+- 原因：原实现固定使用 UTC，容易与本地运行窗口显示的北京时间产生 8 小时误差。
+- 影响：日志字段不变，默认时间显示为 `+08:00`；无效时区回退到 `Asia/Shanghai`，已有日志不改写。
+
+## ADR-035：简历 grounding 支持有限连续行
+
+- 日期：2026-10-15
+- 状态：已采用
+- 决策：CandidateProfile 非空文本和 EvidenceRef.quote 可匹配单行，或最多 3 条同页/同段且物理行号连续的原文；拼接只做空白归一化，locator 记录起止行。
+- 原因：PDF 文本抽取及排版会把一个句子断成相邻物理行；原先逐行匹配会误拒绝真实原文。必须覆盖这一版式，同时避免将模型概括或跳行拼接当成事实。
+- 影响：CandidateProfile/EvidenceRef/API Schema 不变；多行 locator 新增 `start-end` 表示。新增确定性 grounding eval，真实模型准确率需另行验证。
+- 边界：最多 3 行，不跨页/文本段，不跨行号缺口，不允许同义改写；仍最多执行一次模型修复。
+
+## ADR-036：Grounding 查找统一清洗不可见字符
+
+- 日期：2026-10-15
+- 状态：已采用
+- 决策：原文行与模型抽取值在 grounding 查找前使用同一 lookup 规范化：Unicode NFKC、大小写折叠，仅保留可见字母、数字和组合标记，忽略空白、标点、符号及 Unicode 控制/格式字符（包括零宽字符、BOM、软连字符）。
+- 原因：PDF 文本层和模型输出可能在换行、空格或不可见字符上存在表示差异，单边或仅空白折叠会误报事实不一致。
+- 影响：只影响 `contains_exact_span`、`locate_quote` 及 evidence 去重的查找口径；原始 `ResumeDocument`、CandidateProfile 和 EvidenceRef 内容保持不变，Schema/API 不变。新增不可见字符、空白和标点差异回归测试。
+
+## ADR-037：JD grounding 复用可见文字与连续行口径
+
+- 日期：2026-10-16
+- 状态：已采用
+- 决策：`JobDocument` 与 `ResumeDocument` 共享同一查找语义：lookup 只使用可见字母/数字/组合标记（NFKC + casefold），字段值与 evidence.quote 可匹配单行或最多 3 条行号连续的 JD 行，locator 支持 `line:N-line:M`；marker 分类校验与占位符集合也统一在 normalize 后比较。
+- 原因：ADR-036 把 lookup 改成仅保留可见字符后，JD 侧三处隐式假设失效——原始英文 marker 中的空格在无空格行内不再匹配，占位符集合按原文写法比较，以及 Reflection 词边界正则在无分隔符文本上永远失败；这些共同导致真实请求中 JD 全量 grounding 误拒（前端表现为 "Selected job index 0 could not be analyzed"）。
+- 影响：JobProfile/EvidenceRef Schema 不变；JD 证据引用从仅单行放宽为最多 3 条相邻行，与简历口径一致；`_mentions` 分词边界修复覆盖 Reflection 全部检查。新增确定性回归测试，真实模型结果需另行验证。
+- 边界：最多 3 行、不跳行、不允许语义改写；连续性按物理行号判定，与简历实现一致。
+
+## ADR-038：JD grounding 失败写入独立诊断日志
+
+- 日期：2026-10-16
+- 状态：已采用
+- 决策：JD 原文校验失败时写入 `jobs.grounding.failed`，字段与 resume 侧 `resume.grounding.failed` 对齐（request_id、job_index、node、error_type、grounding_issue、unsupported_count/fields/preview），且不受 `LOG_CAPTURE_CONTENT` 控制。
+- 原因：`analyze_jobs` 会捕获 `JobGroundingError` 并写入 `job_errors`，节点仍标记为 success，最终只表现为 `analyze_gap` 的 "Selected job index N could not be analyzed"。原日志不记录失败原因，必须临时开启内容捕获才能定位，排障成本高且容易误判为索引错位。
+- 影响：新增 `job_index` 日志字段（已在 `EVENT_FIELDS` 白名单内）；`ground_job_profile` 新增可选 `request_id` 参数，兼容既有调用；`JobProfile`/`EvidenceRef`/API Schema 不变。新增字段路径感知的 `_profile_string_items` 供日志精确标注字段。
+- 边界：日志只记录未通过校验的字段名和最多 2000 字符的值预览；仍属含业务文本的本地文件，建议排障后删除。
+
+## ADR-039：工作流输入收紧为单 JD
+
+- 日期：2026-10-16
+- 状态：已采用
+- 决策：`AgentInput.raw_jobs` / `InternalInput.raw_jobs` / `JobBatchRequest.raw_jobs` 均限制为恰好一项，`Settings.max_jobs` 固定为 1，`selected_job_index` 恒为 0；前端只保留一个 JD 输入框。
+- 原因：维护者决定 v1.0 以「一次分析一个岗位」为交互模型。原 5 输入框设计让用户容易把含多个岗位的整份文件粘进单个输入框，模型只能产出混合画像，分类判定必然失败并表现为「选定岗位无法分析」。
+- 影响：`create_initial_state` 去掉 `max_jobs` 参数；空数组或多 JD 在模型调用前返回 422。`job_errors`、`job_profiles`、`batch_statistics` 字段与批量统计模块保留，语义改为「请求规模恒为 1 时的退化情形」；单岗位失败时报告为 `failed`，`valid_jobs=0`、`failed_jobs=1`。核心业务 Schema 与评分/RAG/Graph 拓扑不变，但**这是破坏性契约变更**：任何提交多 JD 的调用方需要改为逐岗位多次请求。
+- 边界：恢复多岗位需同时放开三个 Schema 上限、`MAX_JOBS` 和前端输入，三者缺一不可。
+
+## ADR-040：required/preferred 支持中文分节标题
+
+- 日期：2026-10-16
+- 状态：已采用
+- 决策：required 标记增加 `任职要求`/`岗位要求`/`职位要求`/`任职资格`/`硬性要求`/`必备`/`必须`；preferred 增加 `加分项`/`加分`/`优先`。除同行标记外，新增分节标题识别：某行去除首尾标点后恰好等于某个标记即视为标题，其后各行归入该节直到下一个标题。行内相反标记优先于父节归属。
+- 原因：真实中文 JD 的常见版式是 `任职要求：` 单独成行、编号条款在下方，与英文 `Required skills: ...` 的同行版式不同。既有的同行匹配对这种版式结构性失效，导致本可正确抽取的技能被判定为「缺少明示分类标记」而拒绝。
+- 影响：`_has_marked_support` 改为委托 `JobDocument.has_marked_support`，分节状态在同一方法内维护；required 与 preferred 各自只接受本类型标记，标题不会跨类型串扰。同行标记行为不变，向后兼容。`JobProfile` Schema 不变。
+- 边界：标题必须独占一行（允许尾随标点）；标题只在其后的行内生效，不会回溯到标题之前的关键词区。`优先` 等短标记仍可能命中正文措辞，因此保留了「行内相反标记优先」规则来降低误判，未引入任何语义相似度判定。
+
+## ADR-041：CLI 与本地 env 模板纳入单 JD 契约
+
+- 日期：2026-10-16
+- 状态：已采用
+- 决策：`main.py` 三处 `create_initial_state` 调用删除 `max_jobs` 传参；`--run-workflow` 由 `nargs="+"` 改为 `nargs=2`（一个简历 + 恰好一个 JD），`--selected-job-index` 增加 `choices=[0]`；`.env` 与 `.env.example` 的 `MAX_JOBS` 由 20 改为 1；新增测试 `test_shipped_env_example_loads_with_project_defaults` 用 `Settings(_env_file=...)` 真实加载两个模板文件并断言 `max_jobs == 1`。
+- 原因：ADR-038/039 收紧 Schema 与 `Settings.max_jobs` 后，测试套件仍全绿（211 passed），但真实入口是坏的——CLI 会因 `create_initial_state` 不再接受 `max_jobs` 抛 `TypeError`，本地 `.env` 的 `MAX_JOBS=20` 会让 `load_settings()` 抛 `ConfigurationError`。根因是**所有测试都显式构造 `Settings` 与直接调用 API/Graph，从不经过 CLI，也不读 `.env`**，配置模板与入口脚本因而处于测试盲区。这类「契约变更只改了一半」的漏改代价是发布即不可用，必须在收尾阶段用真实入口冒烟验证而非只看测试计数。
+- 影响：CLI 与真实配置加载对齐单 JD 契约；`MAX_JOBS` 成为有测试守卫的字段，模板陈旧值会在 CI 阶段而非用户首次运行时暴露。`--demo-v02` 保持 5 个合成岗位用于批量统计演示，但其帮助文案已标注「合成批量演示，实时链路为单 JD」，避免被误读为支持多岗位输入。
+- 边界：`check_release.py` 需要 `PYTHONPATH=.` 才能 import `app`，直接运行会报 `No module named 'app'`；这是脚本既有的调用约定，未在本次改动中调整。
+
+## ADR-042：术语匹配统一为「仅 ASCII 边缘要求词边界」
+
+- 日期：2026-10-17
+- 状态：已采用
+- 决策：在 `app/utils/resume_files.py` 新增唯一术语匹配器 `mentions_term(text, term)`，`app/agents/reflection.py` 与 `app/agents/gap_analyzer.py` 共用它。匹配前两侧均走 `normalize_text`；边界检查只在 needle 的 ASCII 字母/数字边缘生效，CJK 边缘不要求边界。Reflection 原有的本地 `_mentions` 实现删除。`frontend/src/App.vue` 的匹配分数字段由 `overall_score` 更正为 `score`。
+- 原因：`GapAnalyzer._evidence_for_skill` 用归一化子串附加证据，`Reflection._mentions` 用词边界复查同一条证据，二者结论相反。中文没有分词符，`\w+` 会把整句并成一个 token，因此 `熟悉<技能>；` 这类最常见的版式下每个中文技能都被判为缺少 JD 证据。由于 `repair_outputs` 只是确定性重跑，两次修复必然无效，最终 `finalize_reflection_failure` 清空 gaps、检索上下文、学习计划与简历建议并返回 `partial`。根因不是某个正则写错，而是**同一事实存在两个判定器**——这一条比任何单点修复都重要。
+- 影响：中文与中英混排 JD 的技能 gap 能通过校验，报告恢复 `success` 并保留学习计划与简历建议；`Java` 不命中 `JavaScript`、`SQL` 不命中 `MySQL` 的防护保持不变。`mentions_term` 不再对 needle 施加 `normalize_skill` 别名映射：匹配对象是 JD 原文措辞，别名展开会让 `K8s` 一类技能找不到自己的原文。`_evidence_for_skill` 保留归一化子串回退，只放宽「哪些引用算作支撑」，使已被测试与 eval 固定的 `lacks JD evidence` 契约不会新增触发（详见边界）。`JobProfile`/`MatchResult`/`SkillGap` Schema 与 Graph 拓扑不变。
+- 边界：`Java` 仅作为 `JavaScript` 片段出现时，回退仍会附加证据而 Reflection 仍会拒绝，理论上可再次触达修复循环；真正的修法是让 `JdAnalyzer` 拒绝「技能仅为更长拉丁词片段」的抽取，属上游独立问题。前端 `overall_score` 之所以能长期静默存在，是因为 `type Report = Record<string, any>` 让 `vue-tsc` 失去检查能力，补类型是后续建议而非本次改动。另外 `eval/run_eval.py` 会覆盖被 `check_release` 断言为 33 例的冻结报告，运行 eval 会使发布检查失败，二者口径待对齐。
+
+## ADR-043：eval 默认输出与冻结发布报告解耦
+
+- 日期：2026-10-17
+- 状态：已采用
+- 决策：`eval/run_eval.py` 的默认输出前缀由 `eval/reports/day9-v0.6` 改为 `eval/reports/latest`，新增 `REPORTS`/`FROZEN_REPORT` 常量并抽出 `build_parser()`；冻结报告仅在显式传入 `--output-prefix eval/reports/day9-v0.6` 时才会被重写。新增 2 条测试锁定该契约。
+- 原因：同一文件被**同时**当作「eval 的默认输出目标」与「`check_release` 断言的只读发布证据」。ADR-040 把 JD 案例由 10 增至 12 后，实跑 case 数变为 35，而冻结报告记 33，于是不带参数运行一次 eval 就会覆盖证据并使发布检查报 `must contain 33 base cases`。这不会影响应用运行（前端/API/工作流都不读 `eval/`），但会让发布闸门因与质量无关的原因变红；若新报告被提交，闸门会长期为红，进而掩盖真实回归。选择改默认输出而非改断言数字，是因为断言 33 是刻意的 freeze guard，每次数据集变动都去改数字会把守卫降级为噪声。
+- 影响：日常运行 eval 不再有副作用，输出落到被 `.gitignore` 排除的 `eval/reports/latest.{json,md}`；`check_release` 的冻结语义与断言值保持不变。刷新正式报告需显式指定前缀，命令已在 `README.md` 与 `eval/reports/README.md` 注明。`build_parser()` 的抽取使默认值可被测试直接断言。
+- 边界：冻结报告与当前数据集仍存在 33 与 35 的口径差异，这是历史快照语义而非缺陷；若将来要重新冻结，需跑 `full` 模式真实调用 GLM 并显式覆盖，本 ADR 不改变该成本。`scripts/check_release.py` 需 `PYTHONPATH=.` 才能 import `app`，属既有调用约定。
