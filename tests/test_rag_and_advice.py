@@ -189,6 +189,38 @@ def test_resume_optimizer_uses_only_existing_evidence_and_supported_skills():
     assert "FastAPI" in suggestions[0].suggested_text
 
 
+def test_resume_optimizer_matches_a_spaced_jd_spelling_and_keeps_resume_wording():
+    evidence = EvidenceRef(
+        source_id="resume:test",
+        quote="熟悉 Postman 接口测试、Fiddler 抓包",
+        locator="line:7",
+    )
+    candidate = CandidateProfile(skills=["Postman", "Fiddler"], evidence=[evidence])
+    job = JobProfile(
+        job_index=0,
+        title="软件测试",
+        required_skills=["Pos tman", "Fid dler"],
+    )
+    suggestions = ResumeOptimizer().optimize(candidate, job, [])
+    assert len(suggestions) == 1
+    # The candidate spelling is quoted back, never the mangled JD spelling.
+    assert suggestions[0].original_text == evidence.quote
+    assert "Pos tman" not in suggestions[0].suggested_text
+    assert "Postman" in suggestions[0].suggested_text
+    assert "Fiddler" in suggestions[0].suggested_text
+
+
+def test_resume_optimizer_does_not_claim_an_unsupported_jd_skill():
+    evidence = EvidenceRef(
+        source_id="resume:test",
+        quote="熟悉 Postman 接口测试",
+        locator="line:7",
+    )
+    candidate = CandidateProfile(skills=["Postman"], evidence=[evidence])
+    job = JobProfile(job_index=0, title="软件测试", required_skills=["LoadRunner"])
+    assert ResumeOptimizer().optimize(candidate, job, [gap("LoadRunner")]) == []
+
+
 def test_resume_optimizer_returns_empty_without_candidate_evidence():
     candidate = CandidateProfile(skills=["Python"])
     job = JobProfile(job_index=0, title="Engineer", required_skills=["Python"])

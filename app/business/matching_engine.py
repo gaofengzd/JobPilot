@@ -9,6 +9,7 @@ from app.schemas.candidate import CandidateProfile, Project
 from app.schemas.job import JobProfile
 from app.schemas.match import MatchResult
 from app.services.embedding import BGEEmbeddingClient, EmbeddingClient
+from app.utils.resume_files import collapse_skill_separators
 
 REQUIRED_WEIGHT = 0.5
 PREFERRED_WEIGHT = 0.2
@@ -131,10 +132,20 @@ def normalize_skill(skill: str) -> str:
     return SKILL_ALIASES.get(normalized, normalized)
 
 
+def match_key(skill: str) -> str:
+    """Return the key that decides two skills denote the same skill.
+
+    Aliases are resolved first so ``k8s`` still meets ``kubernetes``, then word
+    separators collapse so an OCR artifact such as ``Pos tman`` still meets
+    ``Postman``.  The original spelling is preserved for display and evidence.
+    """
+    return collapse_skill_separators(normalize_skill(skill))
+
+
 def _candidate_skill_index(skills: list[str]) -> dict[str, str]:
     index: dict[str, str] = {}
     for skill in skills:
-        index.setdefault(normalize_skill(skill), skill)
+        index.setdefault(match_key(skill), skill)
     return index
 
 
@@ -142,7 +153,7 @@ def _deduplicate_requirements(skills: list[str]) -> list[tuple[str, str]]:
     result: list[tuple[str, str]] = []
     seen: set[str] = set()
     for skill in skills:
-        canonical = normalize_skill(skill)
+        canonical = match_key(skill)
         if canonical not in seen:
             result.append((skill, canonical))
             seen.add(canonical)

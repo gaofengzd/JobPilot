@@ -100,14 +100,60 @@ async function analyze() {
       <p v-if="error" class="error">{{ error }}</p>
 
       <section v-if="report" class="panel report-panel">
-        <div class="section-heading"><span>03</span><h2>分析报告</h2><strong>{{ report.status }}</strong></div>
+        <div class="section-heading"><span>03</span><h2>分析报告</h2><strong>{{ report.status === 'success' ? '成功' : report.status === 'failed' ? '失败' : report.status }}</strong></div>
         <div v-if="selectedMatch" class="score-grid">
           <div><small>匹配分数</small><b>{{ selectedMatch.score ?? '-' }}</b></div>
           <div><small>已匹配必需技能</small><p>{{ (selectedMatch.matched_required_skills || []).join('、') || '无' }}</p></div>
           <div><small>缺失必需技能</small><p>{{ (selectedMatch.missing_required_skills || []).join('、') || '无' }}</p></div>
         </div>
-        <div v-if="report.skill_gaps?.length" class="result-block"><h3>能力差距</h3><pre>{{ JSON.stringify(report.skill_gaps, null, 2) }}</pre></div>
-        <div v-if="report.learning_plan" class="result-block"><h3>学习计划</h3><pre>{{ JSON.stringify(report.learning_plan, null, 2) }}</pre></div>
+        <div v-if="report.skill_gaps?.length" class="result-block">
+          <h3>能力差距</h3>
+          <ul class="item-list">
+            <li v-for="(gap, gapIndex) in report.skill_gaps" :key="`gap-${gapIndex}`">
+              <div class="item-head">
+                <b>{{ gap.skill }}</b>
+                <span class="tag">{{ gap.requirement_type === 'required' ? '必需' : '加分' }}</span>
+              </div>
+              <p class="item-text">{{ gap.reason }}</p>
+              <p v-if="gap.jd_evidence?.length" class="item-source">
+                JD 依据：{{ gap.jd_evidence[0].quote }}（{{ gap.jd_evidence[0].locator }}）
+              </p>
+            </li>
+          </ul>
+        </div>
+        <div v-if="report.learning_plan?.tasks?.length" class="result-block">
+          <h3>学习计划</h3>
+          <ul class="item-list">
+            <li v-for="(task, taskIndex) in report.learning_plan.tasks" :key="`task-${taskIndex}`">
+              <div class="item-head"><b>{{ task.skill }}</b><span class="tag">{{ task.priority }}</span></div>
+              <p class="item-text">{{ task.objective }}</p>
+              <ol class="sub-list">
+                <li v-for="(action, actionIndex) in task.actions || []" :key="actionIndex">{{ action }}</li>
+              </ol>
+              <p class="item-source">
+                产出：{{ task.deliverable }}
+                <template v-if="task.source_chunk_ids?.length">（来源：{{ task.source_chunk_ids.join('、') }}）</template>
+              </p>
+            </li>
+          </ul>
+        </div>
+        <div v-if="report.resume_suggestions?.length" class="result-block">
+          <h3>简历建议</h3>
+          <ul class="item-list">
+            <li v-for="(item, itemIndex) in report.resume_suggestions" :key="`suggestion-${itemIndex}`">
+              <p class="item-text">原文：{{ item.original_text }}</p>
+              <p class="item-text">建议：{{ item.suggested_text }}</p>
+              <ul class="sub-list">
+                <li v-for="(question, questionIndex) in item.questions_to_confirm || []" :key="questionIndex">
+                  {{ question }}
+                </li>
+              </ul>
+              <p v-if="item.candidate_evidence?.length" class="item-source">
+                简历依据：{{ item.candidate_evidence[0].quote }}（{{ item.candidate_evidence[0].locator }}）
+              </p>
+            </li>
+          </ul>
+        </div>
         <p v-if="report.warnings?.length" class="warning">{{ report.warnings.join('；') }}</p>
         <p v-if="report.errors?.length" class="error">{{ report.errors.join('；') }}</p>
       </section>

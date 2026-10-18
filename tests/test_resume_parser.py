@@ -234,7 +234,6 @@ def test_grounded_profile_rewrites_source_and_locator():
     "profile",
     [
         CandidateProfile(skills=["Docker"], evidence=[evidence("Skills: Python")]),
-        CandidateProfile(skills=["Python"], evidence=[evidence("Missing quote")]),
         CandidateProfile(skills=["Python"]),
         CandidateProfile(
             education=[Education(school="Invented University")],
@@ -318,3 +317,96 @@ def test_parse_text_and_empty_text():
 def test_candidate_schema_still_rejects_extra_fields():
     with pytest.raises(ValidationError):
         CandidateProfile(skills=["Python"], invented=True)
+
+
+def _project_resume() -> ResumeDocument:
+    return ResumeDocument(
+        source_id="resume:test",
+        text="1、熟悉 Postman 接口测试。\n2、针对测试内容及流程做好总结，编写测试指导。",
+        lines=(
+            ("line:1", "1、熟悉 Postman 接口测试。"),
+            ("line:2", "2、针对测试内容及流程做好总结，编写测试指导。"),
+        ),
+    )
+
+
+def _condensed_profile() -> CandidateProfile:
+    """A model that condensed two sentences into one unsourceable achievement."""
+    return CandidateProfile(
+        skills=["Postman"],
+        experiences=[
+            Experience(
+                description="测试",
+                achievements=[
+                    "负责 Postman 接口测试并编写了完整的测试指导",
+                    "针对测试内容及流程做好总结，编写测试指导。",
+                ],
+            )
+        ],
+        evidence=[evidence("1、熟悉 Postman 接口测试。")],
+    )
+
+
+def test_one_condensed_achievement_costs_that_achievement_not_the_whole_run():
+    """A paraphrase must degrade the profile, never turn the run into an error."""
+    document = _project_resume()
+    result = ResumeParser(FakeLLM(_condensed_profile())).parse_document(document)
+    assert result.skills == ["Postman"]
+    assert [item for experience in result.experiences for item in experience.achievements] == [
+        "针对测试内容及流程做好总结，编写测试指导。"
+    ]
+
+
+def test_unsourceable_achievement_is_dropped_only_after_the_bounded_repair():
+    document = _project_resume()
+    fake = FakeLLM(_condensed_profile())
+    ResumeParser(fake).parse_document(document)
+    assert len(fake.calls) == 2
+    assert "do not paraphrase" in fake.calls[1][1]["instruction"]
+
+
+def test_dropping_is_logged_as_filtered_not_failed(monkeypatch):
+    stream = io.StringIO()
+    logger = logging.Logger("jobpilot-test")
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(JsonFormatter())
+    logger.addHandler(handler)
+    monkeypatch.setattr("app.agents.resume_parser.logger", logger)
+    ResumeParser(FakeLLM(_condensed_profile())).parse_document(_project_resume())
+    events = [json.loads(line) for line in stream.getvalue().splitlines() if line.strip()]
+    dropped = [event for event in events if event["event"].endswith("unverifiable_dropped")]
+    assert dropped, events
+    assert dropped[-1]["status"] == "filtered"
+    assert "负责 Postman 接口测试并编写了完整的测试指导" in dropped[-1]["unsupported_preview"]
+    handler.close()
+
+
+def test_a_bogus_citation_over_a_real_fact_is_rebuilt_not_rejected():
+    """A verifiable fact must survive; only the unusable citation is discarded.
+
+    "Python" really is in the resume, so refusing the whole candidate would
+    throw away a true fact.  The bad quote is dropped and the fact is re-cited
+    from the line it actually came from, which invents nothing.
+    """
+    document = ResumeDocument(
+        source_id="resume:test",
+        text="Skills: Python",
+        lines=(("line:1", "Skills: Python"),),
+    )
+    profile = CandidateProfile(skills=["Python"], evidence=[evidence("Missing quote")])
+    result = ResumeParser(FakeLLM(profile)).parse_document(document)
+    assert result.skills == ["Python"]
+    assert result.evidence == [
+        EvidenceRef(source_id="resume:test", quote="Python", locator="line:1")
+    ]
+
+
+def test_a_fact_without_any_source_still_fails():
+    document = ResumeDocument(
+        source_id="resume:test",
+        text="Skills: Python",
+        lines=(("line:1", "Skills: Python"),),
+    )
+    profile = CandidateProfile(skills=["Docker"], evidence=[evidence("Skills: Python")])
+    with pytest.raises(ResumeGroundingError):
+        ResumeParser(FakeLLM(profile)).parse_document(document)

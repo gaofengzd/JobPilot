@@ -35,7 +35,10 @@ class Settings(BaseSettings):
     log_capture_content: bool = False
     max_jobs: int = Field(default=1, ge=1, le=1)
     max_repair_attempts: int = Field(default=2, ge=0, le=2)
-    request_timeout_seconds: float = Field(default=60, gt=0, allow_inf_nan=False)
+    # A structured-output call that also has to copy long Chinese source text
+    # verbatim regularly outlasts a one minute budget on a hosted reasoning
+    # model, and a timed-out call is lost work rather than a slow answer.
+    request_timeout_seconds: float = Field(default=180, gt=0, allow_inf_nan=False)
 
     def require_llm(self) -> None:
         missing = []

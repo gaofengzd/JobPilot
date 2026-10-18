@@ -2,7 +2,7 @@
 
 from typing import Literal, Protocol
 
-from app.business.matching_engine import normalize_skill
+from app.business.matching_engine import match_key
 from app.core.exceptions import ToolArgumentError
 from app.schemas.common import Contract, NonEmptyText, NonNegativeInt
 from app.schemas.gap import SkillGap
@@ -51,7 +51,7 @@ class RetrieveKnowledgeTool:
         if arguments.job_index != job_index:
             raise ToolArgumentError("Tool job_index does not match the selected job.")
         if (
-            normalize_skill(arguments.skill) != normalize_skill(allowed_gap.skill)
+            match_key(arguments.skill) != match_key(allowed_gap.skill)
             or arguments.requirement_type != allowed_gap.requirement_type
         ):
             raise ToolArgumentError("Tool arguments do not match the validated skill gap.")

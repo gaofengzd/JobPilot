@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from app.business.matching_engine import MatchingEngine, normalize_skill
+from app.business.matching_engine import MatchingEngine, match_key, normalize_skill
 from app.core.exceptions import MatchCalculationError
 from app.schemas.candidate import CandidateProfile, Project
 from app.schemas.job import JobProfile
@@ -58,6 +58,34 @@ def test_alias_dictionary_is_explicit_and_does_not_merge_related_frameworks():
     assert normalize_skill("LangChain") == "langchain"
     assert normalize_skill("LangGraph") == "langgraph"
     assert normalize_skill("LangChain") != normalize_skill("LangGraph")
+
+
+def test_spacing_noise_in_a_jd_skill_still_matches_the_resume_skill():
+    candidate = CandidateProfile(skills=["Postman", "JMeter", "LoadRunner"])
+    job = JobProfile(
+        job_index=0,
+        title="软件测试",
+        required_skills=["Pos tman", "Jme ter", "Load Runner"],
+    )
+    result = MatchingEngine().match(candidate, job)
+    assert result.matched_required_skills == ["Pos tman", "Jme ter", "Load Runner"]
+    assert result.missing_required_skills == []
+    assert result.required_skill_coverage == pytest.approx(1.0)
+
+
+def test_collapsed_key_keeps_language_variants_distinct():
+    assert match_key("c") != match_key("c++")
+    assert match_key("c++") != match_key("c#")
+    assert match_key("Pos tman") == match_key("Postman")
+    assert match_key("scikit-learn") == match_key("scikit learn")
+    assert match_key("k8s") == match_key("Kubernetes")
+
+
+def test_evidence_keeps_the_original_jd_spelling_after_a_spaced_match():
+    candidate = CandidateProfile(skills=["Postman"])
+    job = JobProfile(job_index=0, title="软件测试", required_skills=["Pos tman"])
+    result = MatchingEngine().match(candidate, job)
+    assert any("'Pos tman'" in line and "'Postman'" in line for line in result.evidence)
 
 
 def test_project_similarity_uses_highest_project_responsibility_pair():

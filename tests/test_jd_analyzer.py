@@ -12,6 +12,7 @@ from app.agents.jd_analyzer import (
     REQUIRED_MARKERS,
     JDAnalyzer,
     build_job_document,
+    ground_job_profile,
 )
 from app.core.exceptions import JobGroundingError
 from app.core.logging import JsonFormatter
@@ -30,6 +31,18 @@ class FakeLLM:
     def structured(self, schema, **kwargs):
         self.calls.append((schema, kwargs))
         return self.profile
+
+
+class SequenceLLM:
+    """Return one profile per call so the bounded repair can be observed."""
+
+    def __init__(self, *profiles: JobProfile) -> None:
+        self.profiles = list(profiles)
+        self.calls = []
+
+    def structured(self, schema, **kwargs):
+        self.calls.append((schema, kwargs))
+        return self.profiles[min(len(self.calls) - 1, len(self.profiles) - 1)]
 
 
 def evidence(quote: str) -> EvidenceRef:
@@ -121,18 +134,132 @@ def test_invalid_job_index_fails_before_model(job_index):
             title="Engineer",
             evidence=[evidence("Missing quote")],
         ),
-        JobProfile(
-            job_index=0,
-            title="Engineer",
-            required_skills=["Kubernetes"],
-            evidence=[evidence("Title: Engineer")],
-        ),
     ],
 )
 def test_ungrounded_job_output_is_rejected(profile):
     fake = FakeLLM(profile)
     with pytest.raises(JobGroundingError):
         JDAnalyzer(fake).analyze("Title: Engineer\nRequired skills: Python", job_index=0)
+
+
+def test_one_invented_skill_is_dropped_without_discarding_the_job():
+    """An invented skill must cost the skill, not the only job there is.
+
+    The job keeps its verified title, and the invented requirement is discarded
+    rather than reported, so the anti-hallucination guarantee still holds.
+    """
+    profile = JobProfile(
+        job_index=0,
+        title="Engineer",
+        required_skills=["Kubernetes"],
+        evidence=[evidence("Title: Engineer")],
+    )
+    result = JDAnalyzer(FakeLLM(profile)).analyze(
+        "Title: Engineer\nRequired skills: Python", job_index=0
+    )
+    assert result.title == "Engineer"
+    assert result.required_skills == []
+
+
+def _slashed_jd() -> str:
+    return "Title: Software Tester\n任职要求：\n1）掌握动态测试（白盒/黑盒测试）"
+
+
+def _slashed_profile(*, required_skills: list[str]) -> JobProfile:
+    return JobProfile(
+        job_index=0,
+        title="Software Tester",
+        required_skills=required_skills,
+        evidence=[evidence("Title: Software Tester")],
+    )
+
+
+def test_paraphrased_skill_is_repaired_by_one_bounded_retry():
+    """A model that normalizes '白盒/黑盒测试' to '白盒测试' must not drop the job."""
+    fake = SequenceLLM(
+        _slashed_profile(required_skills=["白盒测试"]), _slashed_profile(required_skills=[])
+    )
+    result = JDAnalyzer(fake).analyze(_slashed_jd(), job_index=0)
+    assert result.required_skills == []
+    assert result.title == "Software Tester"
+    assert len(fake.calls) == 2
+    assert "repair attempt" in fake.calls[1][1]["instruction"].lower()
+
+
+def test_job_repair_is_bounded_to_one_extra_call():
+    """The repair gets exactly one extra attempt, then the job is salvaged."""
+    fake = SequenceLLM(_slashed_profile(required_skills=["白盒测试"]))
+    result = JDAnalyzer(fake).analyze(_slashed_jd(), job_index=0)
+    assert len(fake.calls) == 2
+    # The paraphrased skill is gone, the verified title stays.
+    assert result.required_skills == []
+    assert result.title == "Software Tester"
+
+
+def _clause_jd() -> str:
+    return (
+        "Title: 软件测试\n任职要求：\n"
+        "1）掌握测试环境与工具运维技能，能运维性能测试工具(Jmeter、LoadRunner)。\n"
+        "2）熟练运用141、2725A等标准。"
+    )
+
+
+def test_whole_requirement_clauses_are_dropped_from_skill_lists():
+    """A requirement clause is not a skill, so it must never become a gap."""
+    profile = JobProfile(
+        job_index=0,
+        title="软件测试",
+        required_skills=["掌握测试环境与工具运维技能", "Jmeter"],
+        evidence=[evidence("Title: 软件测试")],
+    )
+    result = JDAnalyzer(FakeLLM(profile)).analyze(_clause_jd(), job_index=0)
+    assert result.required_skills == ["Jmeter"]
+    assert result.title == "软件测试"
+
+
+def test_bare_standard_numbers_are_dropped_from_skill_lists():
+    profile = JobProfile(
+        job_index=0,
+        title="软件测试",
+        required_skills=["141", "2725A", "Jmeter"],
+        evidence=[evidence("Title: 软件测试")],
+    )
+    result = JDAnalyzer(FakeLLM(profile)).analyze(_clause_jd(), job_index=0)
+    assert result.required_skills == ["Jmeter"]
+
+
+def test_dropping_clauses_keeps_the_job_instead_of_failing_it():
+    profile = JobProfile(
+        job_index=0,
+        title="软件测试",
+        required_skills=["掌握测试环境与工具运维技能"],
+        evidence=[evidence("Title: 软件测试")],
+    )
+    result = JDAnalyzer(FakeLLM(profile)).analyze(_clause_jd(), job_index=0)
+    assert result.required_skills == []
+    assert result.title == "软件测试"
+
+
+def test_dropped_clauses_are_logged_as_non_atomic(monkeypatch):
+    stream = io.StringIO()
+    logger = logging.Logger("jobpilot-test")
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(JsonFormatter())
+    logger.addHandler(handler)
+    monkeypatch.setattr("app.agents.jd_analyzer.logger", logger)
+    profile = JobProfile(
+        job_index=0,
+        title="软件测试",
+        required_skills=["掌握测试环境与工具运维技能", "141"],
+        evidence=[evidence("Title: 软件测试")],
+    )
+    JDAnalyzer(FakeLLM(profile)).analyze(_clause_jd(), job_index=0)
+    event = json.loads(stream.getvalue().splitlines()[-1])
+    assert event["event"] == "jobs.grounding.non_atomic_skill_dropped"
+    assert event["grounding_issue"] == "non_atomic_skill"
+    assert event["unsupported_count"] == 2
+    assert "掌握测试环境与工具运维技能" in event["unsupported_preview"]
+    handler.close()
 
 
 def test_evidence_is_deduplicated_and_relocated():
@@ -168,7 +295,23 @@ def test_required_preferred_misclassification_is_rejected():
     )
     text = "Title: Engineer\nRequired skills: Python\nPreferred skills: Redis"
     with pytest.raises(JobGroundingError, match="classification"):
-        JDAnalyzer(FakeLLM(profile)).analyze(text, job_index=0)
+        ground_job_profile(profile, build_job_document(text, source_id="job:0"), job_index=0)
+
+
+def test_unclassifiable_skills_are_dropped_not_guessed():
+    """A skill the JD never marks must not be reported as required or preferred."""
+    profile = JobProfile(
+        job_index=0,
+        title="Engineer",
+        required_skills=["Redis"],
+        preferred_skills=["Python"],
+        evidence=[evidence("Title: Engineer")],
+    )
+    text = "Title: Engineer\nRequired skills: Python\nPreferred skills: Redis"
+    result = JDAnalyzer(FakeLLM(profile)).analyze(text, job_index=0)
+    assert result.required_skills == []
+    assert result.preferred_skills == []
+    assert result.title == "Engineer"
 
 
 def test_chinese_required_heading_applies_to_following_lines():
@@ -378,14 +521,14 @@ def test_unmarked_skill_classification_is_logged(monkeypatch):
     logger.addHandler(handler)
     monkeypatch.setattr("app.agents.jd_analyzer.logger", logger)
 
-    with pytest.raises(JobGroundingError, match="classification"):
-        JDAnalyzer(FakeLLM(profile)).analyze("Title: Engineer\nKeywords: Kubernetes", job_index=0)
+    JDAnalyzer(FakeLLM(profile)).analyze("Title: Engineer\nKeywords: Kubernetes", job_index=0)
 
-    event = json.loads(stream.getvalue().splitlines()[-1])
-    assert event["event"] == "jobs.grounding.failed"
-    assert event["grounding_issue"] == "unmarked_skill_classification"
-    assert "required_skills[0]" in event["unsupported_fields"]
-    assert "Kubernetes" in event["unsupported_preview"]
+    events = [json.loads(line) for line in stream.getvalue().splitlines() if line.strip()]
+    dropped = [event for event in events if event["event"].endswith("unverifiable_dropped")]
+    assert dropped, events
+    assert dropped[-1]["status"] == "filtered"
+    assert "required_skills" in dropped[-1]["unsupported_fields"]
+    assert "Kubernetes" in dropped[-1]["unsupported_preview"]
     handler.close()
 
 

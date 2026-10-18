@@ -4,9 +4,7 @@ from app.schemas.gap import SkillGap
 from app.schemas.learning import LearningPlan, LearningTask, RetrievedDocument
 from app.utils.resume_files import normalize_text
 
-EMPTY_RETRIEVAL_WARNING = (
-    "Knowledge base has insufficient material; the gap remains and no unsupported task was created."
-)
+EMPTY_RETRIEVAL_WARNING = "知识库素材不足，该技能差距保留，未生成缺乏依据的学习任务。"
 
 
 class LearningPlanner:
@@ -40,18 +38,12 @@ class LearningPlanner:
                 LearningTask(
                     skill=gap.skill,
                     priority=gap.priority,
-                    objective=(
-                        f"Learn the {gap.skill} fundamentals required by the job "
-                        "and complete a verifiable exercise."
-                    ),
+                    objective=f"掌握岗位要求的 {gap.skill} 基础知识，并完成一次可验证的练习。",
                     actions=[
-                        f"Read the {gap.skill} material in {source.source}." for source in sources
+                        f"阅读 {source.source} 中的 {gap.skill} 相关材料。" for source in sources
                     ]
-                    + [
-                        f"Build a minimal {gap.skill} exercise from the source "
-                        "and record its result."
-                    ],
-                    deliverable=f"A runnable minimal {gap.skill} example and learning notes.",
+                    + [f"基于上述材料完成一个最小的 {gap.skill} 练习，并记录结果。"],
+                    deliverable=f"一个可运行的最小 {gap.skill} 示例与学习笔记。",
                     source_chunk_ids=[source.chunk_id for source in sources],
                 )
             )

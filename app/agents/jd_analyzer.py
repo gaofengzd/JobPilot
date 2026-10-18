@@ -1,6 +1,7 @@
 """Extract a grounded JobProfile from one job description."""
 
 import logging
+import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Protocol
@@ -17,6 +18,12 @@ from app.utils.resume_files import (
 )
 
 logger = logging.getLogger("jobpilot")
+
+# A requirement clause in a Chinese JD is a short verb phrase ending on a noun
+# such as 技能 or 经验, and it is longer than any real skill name.
+MAX_ATOMIC_SKILL_CHARS = 16
+_CLAUSE_ENDINGS = ("技能", "能力", "经验", "优先", "要求", "资质")
+_BARE_CODE = re.compile(r"^\d+[a-z]?$")
 
 # Explicit required/preferred markers, English first then the Chinese JD
 # equivalents ("任职要求", "加分项", ...) which are the normal wording in
@@ -180,18 +187,45 @@ class JDAnalyzer:
             text,
             source_id=source_id or f"job:{job_index}",
         )
+        instruction = _instruction(document.source_id, job_index)
         profile = self.llm.structured(
             JobProfile,
-            instruction=_instruction(document.source_id, job_index),
+            instruction=instruction,
             text=document.prompt_text,
             request_id=request_id,
         )
-        return ground_job_profile(
-            profile,
-            document,
-            job_index=job_index,
-            request_id=request_id,
-        )
+        try:
+            return ground_job_profile(
+                profile,
+                document,
+                job_index=job_index,
+                request_id=request_id,
+            )
+        except JobGroundingError:
+            # One bounded correction keeps grounding strict while recovering
+            # exact text that a model paraphrased or split across wrapped JD
+            # lines.  This mirrors the resume repair so a single paraphrase can
+            # never drop the only job in the single-JD contract.
+            profile = self.llm.structured(
+                JobProfile,
+                instruction=instruction
+                + "\nThis is a repair attempt. Output exact source text from one JD line or "
+                "up to three consecutive JD lines joined with spaces; do not paraphrase, "
+                "translate, or normalize skill names. Omit any field that cannot be copied "
+                "exactly, and keep required/preferred classification on explicit markers.",
+                text=document.prompt_text,
+                request_id=request_id,
+            )
+            # The last attempt degrades instead of failing: a single job is the
+            # only input, so dropping the job for one mistyped character would
+            # produce an empty report instead of a slightly smaller one.
+            return ground_job_profile(
+                profile,
+                document,
+                job_index=job_index,
+                request_id=request_id,
+                drop_unverifiable=True,
+            )
 
 
 def build_job_document(text: str, *, source_id: str) -> JobDocument:
@@ -217,6 +251,7 @@ def ground_job_profile(
     *,
     job_index: int,
     request_id: str | None = None,
+    drop_unverifiable: bool = False,
 ) -> JobProfile:
     profile = _normalize_optional_placeholders(profile, document)
     unsupported = sorted(
@@ -227,17 +262,6 @@ def ground_job_profile(
         },
         key=lambda item: item[0],
     )
-    if unsupported:
-        _log_grounding_failure(
-            request_id=request_id,
-            job_index=job_index,
-            issue="unsupported_profile_value",
-            details=unsupported,
-        )
-        raise JobGroundingError(
-            "Job profile contains facts without exact JD support: "
-            + ", ".join(value for _, value in unsupported)
-        )
     invalid_required = [
         skill
         for skill in profile.required_skills
@@ -248,22 +272,65 @@ def ground_job_profile(
         for skill in profile.preferred_skills
         if not _has_marked_support(skill, document, PREFERRED_MARKERS)
     ]
-    if invalid_required or invalid_preferred:
-        _log_grounding_failure(
+    if unsupported or invalid_required or invalid_preferred:
+        if not drop_unverifiable:
+            if unsupported:
+                _log_grounding_failure(
+                    request_id=request_id,
+                    job_index=job_index,
+                    issue="unsupported_profile_value",
+                    details=unsupported,
+                )
+                raise JobGroundingError(
+                    "Job profile contains facts without exact JD support: "
+                    + ", ".join(value for _, value in unsupported)
+                )
+            _log_grounding_failure(
+                request_id=request_id,
+                job_index=job_index,
+                issue="unmarked_skill_classification",
+                details=[
+                    (f"required_skills[{index}]", skill)
+                    for index, skill in enumerate(invalid_required)
+                ]
+                + [
+                    (f"preferred_skills[{index}]", skill)
+                    for index, skill in enumerate(invalid_preferred)
+                ],
+            )
+            raise JobGroundingError(
+                "Required/preferred skill classification lacks an explicit JD marker."
+            )
+        # A single job is the only input, so one corrupted character must not
+        # discard it.  Discard the untraceable text and keep the job.
+        _log_unverifiable_dropped(
             request_id=request_id,
             job_index=job_index,
-            issue="unmarked_skill_classification",
-            details=[
-                (f"required_skills[{index}]", skill) for index, skill in enumerate(invalid_required)
-            ]
-            + [
-                (f"preferred_skills[{index}]", skill)
-                for index, skill in enumerate(invalid_preferred)
-            ],
+            details=unsupported
+            + [("required_skills", skill) for skill in invalid_required]
+            + [("preferred_skills", skill) for skill in invalid_preferred],
         )
-        raise JobGroundingError(
-            "Required/preferred skill classification lacks an explicit JD marker."
-        )
+        profile = _drop_unverifiable_job_facts(profile, document)
+        # A job must have a title, so a corrupted title cannot be dropped and
+        # the extraction is refused instead of being reported.
+        remaining = [
+            (field, value)
+            for field, value in _profile_string_items(profile)
+            if not document.contains_exact_span(value)
+        ]
+        if remaining:
+            _log_grounding_failure(
+                request_id=request_id,
+                job_index=job_index,
+                issue="unsupported_profile_value",
+                details=remaining,
+            )
+            raise JobGroundingError(
+                "Job profile contains facts without exact JD support: "
+                + ", ".join(value for _, value in remaining)
+            )
+
+    profile = _drop_whole_clause_skills(profile, request_id=request_id, job_index=job_index)
 
     if any(_profile_strings(profile)) and not profile.evidence:
         _log_grounding_failure(
@@ -372,12 +439,131 @@ def _has_marked_support(
     return document.has_marked_support(skill, markers)
 
 
+def _drop_unverifiable_job_facts(profile: JobProfile, document: JobDocument) -> JobProfile:
+    """Keep only JD facts that are verbatim and explicitly classified.
+
+    A responsibility the model retyped one character off, and a skill the JD
+    never marked required or preferred, are both removed.  The title is kept:
+    a job must have one, so a corrupted title fails the extraction instead.
+    """
+    updates: dict[str, object] = {}
+    for field, markers in (
+        ("required_skills", REQUIRED_MARKERS),
+        ("preferred_skills", PREFERRED_MARKERS),
+    ):
+        updates[field] = [
+            skill
+            for skill in getattr(profile, field)
+            if document.contains_exact_span(skill) and _has_marked_support(skill, document, markers)
+        ]
+    for field in ("responsibilities", "keywords"):
+        updates[field] = [
+            value for value in getattr(profile, field) if document.contains_exact_span(value)
+        ]
+    for field in ("company", "education_requirement", "experience_requirement"):
+        value = getattr(profile, field)
+        if value is not None and not document.contains_exact_span(value):
+            updates[field] = None
+    return profile.model_copy(update=updates)
+
+
+def _log_unverifiable_dropped(
+    *,
+    request_id: str | None,
+    job_index: int,
+    details: list[tuple[str, str]],
+) -> None:
+    log_event(
+        logger,
+        "jobs.grounding.unverifiable_dropped",
+        level=logging.WARNING,
+        request_id=request_id,
+        node="analyze_jobs",
+        status="filtered",
+        job_index=job_index,
+        grounding_issue="unsupported_profile_value",
+        unsupported_count=len(details),
+        unsupported_fields=sorted({field for field, _ in details}),
+        **content_fields(
+            [{"field": field, "value": value} for field, value in details],
+            prefix="unsupported",
+            capture=True,
+        ),
+    )
+
+
+def _drop_whole_clause_skills(
+    profile: JobProfile,
+    *,
+    request_id: str | None,
+    job_index: int,
+) -> JobProfile:
+    """Remove requirement clauses and bare codes from the skill lists.
+
+    The literal-span check alone cannot tell a skill from a sentence: a model
+    may copy a whole requirement clause ("掌握测试环境与工具运维技能") or a bare
+    standard number ("141", "2725A") into ``required_skills``, and both are
+    literally present in the JD.  They are still unusable as skills, because
+    nothing in a resume can ever equal them, so every downstream match, gap,
+    and learning task would be built on a phrase that no candidate can hold.
+
+    Dropping them keeps the job: the clause is real JD text and stays available
+    through responsibilities and evidence, so a noisy extraction degrades to a
+    smaller requirement set instead of an empty report or a fake gap list.
+    """
+    dropped: list[tuple[str, str]] = []
+    updates: dict[str, list[str]] = {}
+    for field in ("required_skills", "preferred_skills"):
+        kept = [skill for skill in getattr(profile, field) if _is_atomic_skill(skill)]
+        dropped.extend((field, skill) for skill in getattr(profile, field) if skill not in kept)
+        updates[field] = kept
+    if not dropped:
+        return profile
+    log_event(
+        logger,
+        "jobs.grounding.non_atomic_skill_dropped",
+        level=logging.WARNING,
+        request_id=request_id,
+        node="analyze_jobs",
+        status="filtered",
+        job_index=job_index,
+        grounding_issue="non_atomic_skill",
+        unsupported_count=len(dropped),
+        **content_fields(
+            [{"field": field, "value": value} for field, value in dropped],
+            prefix="unsupported",
+            capture=True,
+        ),
+    )
+    return profile.model_copy(update=updates)
+
+
+def _is_atomic_skill(value: str) -> bool:
+    visible = normalize_text(value)
+    if not visible:
+        return False
+    # "141" and "2725A" are standard numbers, not skills anyone can hold.
+    if _BARE_CODE.match(visible):
+        return False
+    # Chinese has no spaces, so a whole clause is caught by its length and by
+    # the noun a requirement clause ends on.
+    if len(visible) > MAX_ATOMIC_SKILL_CHARS or value.strip().endswith(_CLAUSE_ENDINGS):
+        return False
+    return True
+
+
 def _instruction(source_id: str, job_index: int) -> str:
     return f"""
 Extract only facts explicitly written in the job description into JobProfile.
 Set job_index to {job_index}. The source ID is {source_id}.
 Every non-empty string must copy an exact span from one JD line. Do not translate,
 paraphrase, normalize skill names, infer requirements, or add facts.
+A skill entry is one atomic name: a tool, technology, language, method, or
+standard, such as Jmeter, LoadRunner, Postman, or Python. Copy the name exactly
+as the JD spells it and keep one name per entry. Never copy a whole requirement
+clause into a skill list, and never copy a bare standard number. When a
+requirement clause names several tools, emit each tool as its own skill entry
+and put the clause itself in responsibilities.
 Put a skill in required_skills only when the JD explicitly marks it required,
 must-have, mandatory, necessary, or uses the Chinese headings 任职要求 / 岗位要求 /
 职位要求 / 任职资格 / 必备 / 必须. Put it in preferred_skills only when explicitly

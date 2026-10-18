@@ -10,6 +10,8 @@ from pypdf import PdfReader
 
 from app.core.exceptions import ResumeReadError
 
+_SKILL_SEPARATORS = re.compile(r"[\s_./\\-]+")
+
 SUPPORTED_SUFFIXES = {".pdf", ".md", ".txt"}
 MAX_RESUME_BYTES = 5 * 1024 * 1024
 MAX_GROUNDING_LINES = 3
@@ -170,6 +172,25 @@ def normalize_text(value: str) -> str:
     normalized = unicodedata.normalize("NFKC", value).casefold()
     return "".join(
         char for char in normalized if char.isalnum() or unicodedata.category(char).startswith("M")
+    )
+
+
+def collapse_skill_separators(value: str) -> str:
+    """Collapse word separators so spacing never decides identity.
+
+    JD text reaches this pipeline through OCR-like exports and wrapped source
+    lines, so ``Postman`` can arrive as ``Pos tman`` and ``scikit-learn`` as
+    ``scikit learn``.  Every separator collapses to nothing, while ``+`` and
+    ``#`` survive because they distinguish real skills (``c``, ``c++``,
+    ``c#``).  This is a comparison form only: the original spelling stays
+    wherever a skill is displayed or cited as evidence.
+    """
+    normalized = unicodedata.normalize("NFKC", value).casefold()
+    collapsed = _SKILL_SEPARATORS.sub("", normalized)
+    return "".join(
+        char
+        for char in collapsed
+        if char in "+#" or char.isalnum() or unicodedata.category(char).startswith("M")
     )
 
 

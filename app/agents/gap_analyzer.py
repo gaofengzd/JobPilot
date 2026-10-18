@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from app.business.matching_engine import normalize_skill
+from app.business.matching_engine import match_key
 from app.core.exceptions import GapAnalysisError
 from app.schemas.common import EvidenceRef
 from app.schemas.gap import SkillGap
@@ -30,21 +30,22 @@ class GapAnalyzer:
         priority: int,
     ) -> list[SkillGap]:
         requirements = {
-            normalize_skill(skill): skill for skill in getattr(job, f"{requirement_type}_skills")
+            match_key(skill): skill for skill in getattr(job, f"{requirement_type}_skills")
         }
         result: list[SkillGap] = []
         for skill in missing_skills:
-            canonical = normalize_skill(skill)
+            canonical = match_key(skill)
             if canonical not in requirements:
                 raise GapAnalysisError("Match contains a missing skill absent from the JD profile.")
             evidence = _evidence_for_skill(job.evidence, requirements[canonical])
             if not evidence:
                 raise GapAnalysisError(f"Missing {requirement_type} skill lacks JD evidence.")
+            label = "必需" if requirement_type == "required" else "加分"
             result.append(
                 SkillGap(
                     skill=requirements[canonical],
                     requirement_type=requirement_type,
-                    reason=f"Resume does not mention this {requirement_type} JD skill.",
+                    reason=f"简历中未提及该岗位{label}技能。",
                     evidence_status="not_mentioned",
                     jd_evidence=evidence,
                     priority=priority,

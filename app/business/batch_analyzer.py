@@ -2,7 +2,7 @@
 
 from collections import defaultdict
 
-from app.business.matching_engine import normalize_skill
+from app.business.matching_engine import match_key
 from app.core.exceptions import BatchAnalysisError
 from app.schemas.batch import BatchStatistics, SkillFrequency
 from app.schemas.candidate import CandidateProfile
@@ -48,7 +48,7 @@ class BatchAnalyzer:
             for skill in required | preferred:
                 any_counts[skill] += 1
 
-        candidate_skills = {normalize_skill(skill) for skill in candidate.skills}
+        candidate_skills = {match_key(skill) for skill in candidate.skills}
         valid_jobs = len(jobs)
         frequencies = [
             SkillFrequency(
@@ -78,7 +78,7 @@ class BatchAnalyzer:
 def _skill_set(skills: list[str], labels: dict[str, str]) -> set[str]:
     result: set[str] = set()
     for skill in skills:
-        canonical = normalize_skill(skill)
+        canonical = match_key(skill)
         labels.setdefault(canonical, skill)
         result.add(canonical)
     return result
